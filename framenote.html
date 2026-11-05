@@ -1,0 +1,2810 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>拾帧 FrameNote — 随手记与画册</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Serif+SC:wght@500;600;700&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
+                        serif: ['"Noto Serif SC"', 'serif'],
+                    },
+                    colors: {
+                        apple: {
+                            bg: '#F6F5F1',
+                            card: '#FFFFFF',
+                            text: '#1C1C1E',
+                            sub: '#8E8E93',
+                            accent: '#C67D5A',
+                            accentLight: '#F4EAE3',
+                            border: '#E5E3DC',
+                            tag: '#EAE8E1'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            background-color: #E2DFD7;
+            font-family: 'Inter', -apple-system, sans-serif;
+            -webkit-tap-highlight-color: transparent;
+            user-select: none;
+        }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        .ios-blur {
+            backdrop-filter: saturate(180%) blur(20px);
+            -webkit-backdrop-filter: saturate(180%) blur(20px);
+        }
+        .book-spine {
+            box-shadow: inset 5px 0 10px rgba(0,0,0,0.18), 4px 8px 18px rgba(28,28,30,0.12);
+        }
+        .washi-tape {
+            background: rgba(235, 222, 198, 0.78);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+        }
+    </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-2 sm:p-4">
+
+    <!-- 严格锁定手机视口高度 844px (iPhone 标准比例)，内部独立滚动 -->
+    <div class="w-full max-w-[392px] h-[844px] max-h-[94vh] bg-apple-bg rounded-[46px] shadow-[0_24px_70px_rgba(0,0,0,0.22)] border-[9px] border-[#262523] relative overflow-hidden flex flex-col">
+
+        <!-- iOS 顶部状态栏 -->
+        <div class="h-10 px-7 pt-2 flex justify-between items-center text-[11px] font-semibold text-apple-text shrink-0 z-30 bg-apple-bg/90 ios-blur">
+            <span>21:42</span>
+            <div class="w-20 h-4 bg-[#1C1C1E] rounded-full"></div>
+            <div class="flex items-center space-x-1">
+                <i data-lucide="signal" class="w-3 h-3"></i>
+                <i data-lucide="wifi" class="w-3 h-3"></i>
+                <i data-lucide="battery-full" class="w-4 h-4"></i>
+            </div>
+        </div>
+
+        <!-- 顶栏：动态随动年月 + 右侧日历图标 + 视图分段器 -->
+        <header class="px-4 pt-1 pb-2 bg-apple-bg/90 ios-blur z-20 shrink-0 border-b border-black/[0.04]">
+            <div class="flex items-center justify-between">
+                <button id="header-date-btn" onclick="toggleQuickDateJump()" class="flex items-center space-x-1.5 py-1 group">
+                    <h1 id="header-date-title" class="font-serif text-lg font-bold text-apple-text tracking-tight transition-all">11月</h1>
+                    <span id="header-year-sub" class="text-xs font-serif text-apple-sub">2026</span>
+                    <span id="header-filter-pill" class="hidden text-[10px] bg-apple-accent text-white px-1.5 py-0.5 rounded-md font-sans font-medium">筛选中</span>
+                </button>
+                <div id="header-right-actions" class="flex items-center space-x-1.5">
+                    <button onclick="toggleUncuratedFilter()" id="btn-uncurated" class="px-2.5 py-1 rounded-full bg-apple-tag text-apple-sub text-[11px] font-medium transition-all">
+                        未入册
+                    </button>
+                    <button onclick="toggleQuickDateJump()" id="btn-cal-trigger" class="w-7 h-7 rounded-full bg-apple-tag flex items-center justify-center text-apple-text transition-colors" title="日历筛选">
+                        <i data-lucide="calendar" class="w-3.5 h-3.5"></i>
+                    </button>
+                    <button onclick="toggleSearchBar()" class="w-7 h-7 rounded-full bg-apple-tag flex items-center justify-center text-apple-text">
+                        <i data-lucide="search" class="w-3.5 h-3.5"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- 隐藏式搜索栏 -->
+            <div id="search-bar-wrap" class="hidden mt-2">
+                <div class="relative flex items-center">
+                    <i data-lucide="search" class="w-3.5 h-3.5 text-apple-sub absolute left-3"></i>
+                    <input id="semantic-search-input" oninput="handleSearch(this.value)" type="text" placeholder="搜地点、食物、心情（如：咖啡、大理、猫）..." class="w-full bg-white text-xs text-apple-text rounded-xl pl-8 pr-7 py-2 border border-apple-border focus:outline-none">
+                    <button onclick="clearSearch()" class="absolute right-2.5 text-[10px] text-apple-sub">取消</button>
+                </div>
+            </div>
+
+            <!-- 视图分段控制器：精简为 时光流 / 图库 / 足迹 -->
+            <div id="sub-nav-fragments" class="flex bg-apple-tag/80 p-0.5 rounded-xl text-[11px] font-medium text-apple-sub mt-1.5">
+                <button onclick="switchTimeScale('day')" id="scale-day" class="flex-1 py-1 rounded-[9px] bg-white text-apple-text shadow-sm transition-all">时光流</button>
+                <button onclick="switchTimeScale('gallery')" id="scale-gallery" class="flex-1 py-1 rounded-[9px] transition-all">图库</button>
+                <button onclick="switchTimeScale('map')" id="scale-map" class="flex-1 py-1 rounded-[9px] transition-all">足迹</button>
+            </div>
+        </header>
+
+        <!-- 顶部下拉：极简 iOS 双滚轮（年/月） + 月历网格 -->
+        <div id="quick-date-popover" class="hidden absolute top-[88px] left-3.5 right-3.5 bg-white/95 ios-blur rounded-3xl p-3.5 shadow-2xl border border-apple-border z-40 space-y-2.5">
+            <div class="flex items-center justify-between px-1">
+                <button onclick="toggleWheelPickerMode()" class="flex items-center space-x-1 text-xs font-serif font-bold text-apple-text bg-apple-bg px-2.5 py-1 rounded-xl">
+                    <span id="popover-ym-label">2026年 11月</span>
+                    <i data-lucide="chevrons-up-down" class="w-3 h-3 text-apple-sub"></i>
+                </button>
+                <div class="flex items-center space-x-2.5">
+                    <button onclick="resetDateFilterToAll()" class="text-[11px] text-apple-sub">全部时间</button>
+                    <button onclick="jumpToToday()" class="text-[11px] text-apple-accent font-semibold">回到今天</button>
+                </div>
+            </div>
+
+            <!-- 仿 iOS 时钟双列上下滚轮 -->
+            <div id="ios-wheel-drum" class="hidden bg-apple-bg/80 rounded-2xl p-2 relative">
+                <div class="grid grid-cols-2 gap-2 h-28 overflow-hidden relative">
+                    <div class="pointer-events-none absolute inset-x-2 top-1/2 -translate-y-1/2 h-7 bg-white/90 rounded-lg border border-black/[0.06] shadow-sm z-0"></div>
+                    <div id="wheel-year-col" class="z-10 overflow-y-auto no-scrollbar snap-y snap-mandatory py-9 text-center space-y-1.5"></div>
+                    <div id="wheel-month-col" class="z-10 overflow-y-auto no-scrollbar snap-y snap-mandatory py-9 text-center space-y-1.5"></div>
+                </div>
+            </div>
+
+            <!-- 内嵌月历网格 -->
+            <div>
+                <div class="grid grid-cols-7 gap-1 text-center text-[10px] text-apple-sub mb-1">
+                    <span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span><span>日</span>
+                </div>
+                <div id="popover-calendar-grid" class="grid grid-cols-7 gap-1"></div>
+            </div>
+        </div>
+
+        <!-- 主体滚动视口 -->
+        <main id="main-scroll-area" onscroll="handleMainScroll(this)" class="flex-1 overflow-y-auto no-scrollbar px-4 pt-3 pb-28 relative">
+
+            <!-- ==================== TAB 1：碎片 ==================== -->
+            <div id="tab-view-fragments">
+
+                <!-- 1A. 时光流视图 -->
+                <div id="scale-view-day" class="space-y-6 pb-8">
+                    <div id="timeline-list" class="space-y-6"></div>
+                </div>
+
+                <!-- 1B. 图库视图（纯紧凑网格，日期作为暗线徽标） -->
+                <div id="scale-view-gallery" class="hidden space-y-2.5 pb-8">
+                    <div class="flex items-center justify-between px-0.5">
+                        <span id="gallery-count-label" class="text-[11px] text-apple-sub">7 张影像</span>
+                        <div class="flex space-x-1 text-[10px]">
+                            <button onclick="filterGalleryMedia('all')" id="gal-filter-all" class="px-2.5 py-0.5 rounded-full bg-apple-text text-white font-medium">全部</button>
+                            <button onclick="filterGalleryMedia('live')" id="gal-filter-live" class="px-2.5 py-0.5 rounded-full bg-apple-tag text-apple-sub">LIVE</button>
+                        </div>
+                    </div>
+                    <div id="visual-gallery-grid" class="grid grid-cols-4 gap-1 rounded-2xl overflow-hidden"></div>
+                </div>
+
+                <!-- 1C. 足迹散点视图 -->
+                <div id="scale-view-map" class="hidden space-y-3 pb-8">
+                    <div class="flex bg-apple-tag/70 p-0.5 rounded-xl text-[11px]">
+                        <button onclick="filterMapRange('all')" id="map-range-all" class="flex-1 py-1 rounded-lg bg-white text-apple-text font-medium shadow-sm">全部足迹 (6)</button>
+                        <button onclick="filterMapRange('month')" id="map-range-month" class="flex-1 py-1 rounded-lg text-apple-sub">本月 (4)</button>
+                        <button onclick="filterMapRange('week')" id="map-range-week" class="flex-1 py-1 rounded-lg text-apple-sub">近7天 (3)</button>
+                    </div>
+
+                    <div class="relative w-full h-[350px] rounded-3xl overflow-hidden border border-apple-border bg-[#E6E2D8] shadow-inner">
+                        <svg class="w-full h-full opacity-45" viewBox="0 0 400 360" fill="none">
+                            <path d="M-20 70 Q 130 110 250 50 T 420 100" stroke="#CBD5E1" stroke-width="18" fill="none"/>
+                            <path d="M70 -10 L 140 380 M 260 -10 L 220 380 M -10 200 L 410 240" stroke="#FFFFFF" stroke-width="5"/>
+                            <circle cx="190" cy="170" r="95" stroke="#D5CFC2" stroke-width="1" stroke-dasharray="4 4"/>
+                        </svg>
+                        <div id="map-pins-layer" class="absolute inset-0"></div>
+                        <div class="absolute bottom-3 left-3 right-3 bg-white/95 ios-blur rounded-2xl p-2.5 shadow-sm flex items-center justify-between">
+                            <span id="map-stat-label" class="text-xs font-medium text-apple-text pl-1">当前视野 6 处记忆散点</span>
+                            <button onclick="curateVisibleMapPins()" class="bg-apple-text text-white text-[11px] font-medium px-3 py-1.5 rounded-xl">
+                                合成路线画报
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- ==================== TAB 2：主题画册书架 ==================== -->
+            <div id="tab-view-albums" class="hidden space-y-6 pb-10">
+                <section class="space-y-3">
+                    <div class="flex justify-between items-center px-1">
+                        <h2 class="font-serif font-bold text-sm text-apple-text">我的连载画册</h2>
+                        <button onclick="createNewAlbumBookPrompt()" class="text-xs text-apple-accent font-medium flex items-center space-x-0.5">
+                            <i data-lucide="plus" class="w-3.5 h-3.5"></i><span>新建画册</span>
+                        </button>
+                    </div>
+                    <div id="bookshelf-grid" class="grid grid-cols-2 gap-4 pt-1"></div>
+                </section>
+
+                <!-- 智能聚拢候选池 -->
+                <section class="space-y-2.5 pt-2 border-t border-black/[0.05]">
+                    <div class="flex items-center justify-between px-1">
+                        <span class="font-serif font-bold text-sm text-apple-text">自动聚拢主题</span>
+                        <div class="flex space-x-1 text-[10px]">
+                            <button onclick="switchClusterCategory('people')" id="cluster-tab-people" class="px-2 py-0.5 rounded-full bg-apple-text text-white">人物</button>
+                            <button onclick="switchClusterCategory('place')" id="cluster-tab-place" class="px-2 py-0.5 rounded-full bg-apple-tag text-apple-sub">地点</button>
+                            <button onclick="switchClusterCategory('mood')" id="cluster-tab-mood" class="px-2 py-0.5 rounded-full bg-apple-tag text-apple-sub">饮食</button>
+                        </div>
+                    </div>
+                    <div id="smart-clusters-list" class="space-y-2"></div>
+                </section>
+            </div>
+
+        </main>
+
+        <!-- 浮动“回到今天”胶囊 -->
+        <button id="back-to-today-pill" onclick="jumpToToday()" class="hidden absolute bottom-[118px] right-4 z-30 bg-apple-text/90 text-white text-[11px] font-medium px-3 py-1.5 rounded-full shadow-lg flex items-center space-x-1">
+            <i data-lucide="arrow-up" class="w-3 h-3"></i>
+            <span>今天</span>
+        </button>
+
+        <!-- 勾选碎片后弹出的「合成画报页」深色毛玻璃条 -->
+        <div id="batch-curate-bar" class="hidden absolute bottom-[64px] left-3.5 right-3.5 bg-[#1C1C1E]/95 ios-blur text-white rounded-2xl p-3 shadow-2xl z-30 flex items-center justify-between">
+            <div class="flex items-center space-x-2.5 pl-1">
+                <span id="selected-count-badge" class="w-6 h-6 rounded-full bg-apple-accent text-white text-xs font-bold flex items-center justify-center">2</span>
+                <div>
+                    <p class="text-xs font-medium">已选碎片</p>
+                    <button onclick="clearSelection()" class="text-[10px] text-white/60 underline">取消选择</button>
+                </div>
+            </div>
+            <button onclick="openStudioFromSelection()" class="bg-apple-accent text-white text-xs font-semibold px-4 py-2 rounded-xl flex items-center space-x-1.5 shadow-sm">
+                <i data-lucide="wand-2" class="w-3.5 h-3.5"></i>
+                <span>合成画报</span>
+            </button>
+        </div>
+
+        <!-- 底部极简随手记输入栏 -->
+        <div id="quick-input-bar" class="absolute bottom-[56px] left-0 right-0 px-3.5 pb-2 pt-1 bg-gradient-to-t from-apple-bg via-apple-bg/95 to-transparent z-20">
+            <div id="multi-photo-drawer" class="hidden bg-white p-3 rounded-2xl shadow-lg border border-apple-border/80 mb-2 space-y-2">
+                <div class="flex justify-between items-center text-[11px]">
+                    <span class="font-medium text-apple-text">选择要加入碎片的照片</span>
+                    <button onclick="togglePhotoPickerDrawer()" class="text-apple-sub">收起</button>
+                </div>
+                <div id="photo-picker-grid" class="grid grid-cols-4 gap-1.5"></div>
+            </div>
+
+            <div id="composer-attachments" class="hidden bg-white/95 ios-blur px-3 py-1.5 rounded-t-2xl border border-b-0 border-apple-border/80 flex items-center justify-between"></div>
+
+            <div class="bg-white/95 ios-blur rounded-2xl p-1.5 shadow-[0_8px_24px_rgba(0,0,0,0.08)] border border-apple-border/90 flex items-center space-x-1.5">
+                <button onclick="togglePhotoPickerDrawer()" class="relative w-8 h-8 rounded-xl bg-apple-bg text-apple-text flex items-center justify-center shrink-0">
+                    <i data-lucide="image-plus" class="w-4 h-4"></i>
+                    <span id="composer-img-badge" class="hidden absolute -top-1 -right-1 w-4 h-4 rounded-full bg-apple-accent text-white text-[9px] font-bold flex items-center justify-center">1</span>
+                </button>
+                <input id="composer-input" onkeydown="if(event.key==='Enter') addNewFragment()" type="text" placeholder="随手记下这一刻..." class="flex-1 bg-transparent text-xs text-apple-text placeholder:text-apple-sub focus:outline-none px-1">
+                <button onclick="simulateVoiceInput()" class="w-7 h-7 rounded-xl text-apple-sub hover:text-apple-text flex items-center justify-center shrink-0" title="语音速记">
+                    <i data-lucide="mic" class="w-3.5 h-3.5"></i>
+                </button>
+                <button onclick="addNewFragment()" class="bg-apple-text text-white text-[11px] font-semibold px-3 py-1.5 rounded-xl shrink-0">
+                    记下
+                </button>
+            </div>
+        </div>
+
+        <!-- 底部主导航栏：碎片 / 画册 -->
+        <nav class="h-14 bg-white/90 ios-blur border-t border-black/[0.05] px-12 flex items-center justify-around shrink-0 z-20">
+            <button onclick="switchMainTab('fragments')" id="main-tab-fragments" class="flex flex-col items-center space-y-0.5 text-apple-text">
+                <i data-lucide="layers" class="w-4 h-4"></i>
+                <span class="text-[10px] font-medium">碎片</span>
+            </button>
+            <button onclick="switchMainTab('albums')" id="main-tab-albums" class="flex flex-col items-center space-y-0.5 text-apple-sub relative">
+                <i data-lucide="book-open" class="w-4 h-4"></i>
+                <span class="text-[10px] font-medium">画册</span>
+            </button>
+        </nav>
+
+        <!-- ==================== 模态框 0：碎片详情与模糊时间编辑弹窗 ==================== -->
+        <div id="fragment-detail-modal" class="hidden absolute inset-0 bg-black/40 z-50 flex-col justify-end">
+            <div class="bg-[#F7F5F0] rounded-t-3xl p-4 space-y-3.5 shadow-2xl max-h-[82%] overflow-y-auto no-scrollbar">
+                <div class="flex items-center justify-between">
+                    <span class="font-serif text-[13px] font-semibold text-apple-text">编辑碎片与时刻</span>
+                    <div class="flex items-center space-x-2">
+                        <button onclick="deleteCurrentFragment()" class="text-[11px] text-red-500">删除</button>
+                        <button onclick="closeFragmentDetail()" class="text-[11px] text-apple-sub">取消</button>
+                    </div>
+                </div>
+
+                <!-- 日期与模糊时段胶囊（兼容事后补记，无需强迫精确到分） -->
+                <div class="bg-white rounded-2xl p-3 space-y-2.5 border border-black/[0.04]">
+                    <div class="flex items-center justify-between">
+                        <span class="text-[11px] text-apple-sub">日期与地点</span>
+                        <input id="detail-frag-date-input" type="date" value="2026-11-04" class="text-[11px] text-apple-text bg-apple-bg px-2 py-1 rounded-lg focus:outline-none">
+                    </div>
+                    <div>
+                        <div class="flex items-center justify-between mb-1.5">
+                            <span class="text-[10px] text-apple-sub">时段印象（或填写精确时刻）</span>
+                            <input id="detail-frag-exact-time" type="time" class="text-[10px] text-apple-sub bg-apple-bg px-1.5 py-0.5 rounded focus:outline-none">
+                        </div>
+                        <div id="fuzzy-period-pills" class="flex flex-wrap gap-1.5"></div>
+                    </div>
+                    <div class="flex items-center space-x-1.5 pt-1 border-t border-black/[0.04]">
+                        <i data-lucide="map-pin" class="w-3.5 h-3.5 text-apple-accent shrink-0"></i>
+                        <input id="detail-frag-loc" type="text" placeholder="补记地点（可选）" class="flex-1 text-xs text-apple-text bg-transparent focus:outline-none">
+                    </div>
+                </div>
+
+                <!-- 文本与图片 -->
+                <textarea id="detail-frag-text" rows="3" class="w-full bg-white rounded-2xl p-3 text-xs font-serif text-apple-text border border-black/[0.04] focus:outline-none resize-none" placeholder="写下当时的心情..."></textarea>
+
+                <div class="space-y-1.5">
+                    <div class="flex items-center justify-between px-1">
+                        <span class="text-[11px] text-apple-sub">包含影像</span>
+                        <button onclick="addPhotoToEditingFragment()" class="text-[11px] text-apple-accent font-medium">+ 添加图片</button>
+                    </div>
+                    <div id="detail-frag-images" class="grid grid-cols-3 gap-2"></div>
+                </div>
+
+                <div class="flex space-x-2 pt-1">
+                    <button onclick="curateSingleFragmentFromDetail()" class="flex-1 py-2.5 rounded-2xl bg-apple-accentLight text-apple-accent text-xs font-semibold">单条合成画报</button>
+                    <button onclick="saveFragmentDetail()" class="flex-1 py-2.5 rounded-2xl bg-apple-text text-white text-xs font-semibold">保存修改</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ==================== 模态框 1：画报编辑（长卷 / 翻页 + 就地悬浮工具条 + 合一 AI 审美抽屉） ==================== -->
+        <div id="studio-modal" class="absolute inset-0 bg-[#EDEAE2] z-50 flex-col hidden overflow-hidden">
+
+            <!-- 顶栏：返回 / 载体形态切换（长卷 · 翻页） / 导出与入册 -->
+            <div class="h-12 px-2.5 flex items-center justify-between shrink-0 bg-[#F7F5EF]/95 ios-blur border-b border-black/[0.05] z-20">
+                <button onclick="closeStudioModal()" class="w-8 h-8 rounded-full flex items-center justify-center text-apple-text/75">
+                    <i data-lucide="chevron-left" class="w-5 h-5"></i>
+                </button>
+                <div class="flex bg-black/[0.06] rounded-full p-[2.5px] text-[11px] font-medium text-apple-sub">
+                    <button onclick="switchStudioFormat('long')" id="fmt-long" class="px-3.5 py-1 rounded-full bg-white text-apple-text shadow-sm transition-all">长卷</button>
+                    <button onclick="switchStudioFormat('pages')" id="fmt-pages" class="px-3.5 py-1 rounded-full transition-all">翻页</button>
+                </div>
+                <div class="flex items-center space-x-1">
+                    <button onclick="openShareSheetFromStudio()" class="px-2 py-1.5 rounded-full text-[11px] text-apple-text/70 font-medium">导出</button>
+                    <button onclick="openAlbumPicker()" class="px-2.5 py-1.5 rounded-full bg-apple-text text-white text-[11px] font-semibold">入册</button>
+                </div>
+            </div>
+
+            <!-- 画布区 -->
+            <div id="studio-canvas-scroll" onclick="clearActiveStudioSelection()" class="flex-1 overflow-y-auto no-scrollbar px-4 pt-3 pb-3 relative">
+                <div class="min-h-full flex flex-col justify-center">
+                    <div id="poster-canvas" class="relative transition-opacity duration-300"></div>
+                </div>
+            </div>
+
+            <!-- 底部：素材缩略条 + 唯一合并的 AI 排版入口 -->
+            <div class="shrink-0 bg-white/95 ios-blur border-t border-black/[0.06] px-3.5 py-2 space-y-2">
+                <div class="flex items-center justify-between space-x-2">
+                    <div class="flex items-center space-x-1.5 overflow-x-auto no-scrollbar py-0.5 flex-1">
+                        <div id="inline-selected-frags" class="flex items-center space-x-1.5"></div>
+                        <button onclick="openFragmentManagerSheet()" class="w-7 h-7 rounded-lg border border-dashed border-black/15 text-apple-sub flex items-center justify-center shrink-0">
+                            <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+                        </button>
+                        <button id="btn-restore-blocks" onclick="restoreAllDeletedBlocks()" class="hidden text-[10px] text-apple-accent font-medium shrink-0 px-2 py-1 rounded-lg bg-apple-accentLight">复原</button>
+                    </div>
+
+                    <!-- 唯一 AI 审美与版式入口 -->
+                    <button onclick="openThemeSheet()" class="shrink-0 flex items-center space-x-1.5 px-3.5 py-1.5 rounded-full bg-[#1C1C1E] text-white text-[11px] font-medium shadow-sm active:scale-95 transition-transform">
+                        <i data-lucide="sparkles" class="w-3.5 h-3.5 text-[#E39A76]"></i>
+                        <span id="ai-theme-desc">AI 排版与风格</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- 子抽屉：合一的 AI 排版方案（3 种可视化缩略图推荐 + 自然语言微调 + 传参考图） -->
+            <div id="theme-sheet" class="hidden absolute inset-0 bg-black/35 z-[45] flex-col justify-end">
+                <div class="bg-[#F7F5F0] rounded-t-3xl p-4 space-y-3.5 shadow-2xl">
+                    <div class="flex items-center justify-between">
+                        <span class="font-serif text-[13px] font-semibold text-apple-text">选择 AI 推荐排版</span>
+                        <button onclick="closeThemeSheet()" class="text-[11px] text-apple-sub">收起</button>
+                    </div>
+
+                    <!-- 3 种可视化缩略图版式 -->
+                    <div class="grid grid-cols-3 gap-2.5">
+                        <button onclick="selectAIPresetProposal('kinfolk')" id="ts-kinfolk" class="group text-left bg-white p-2 rounded-2xl border-2 border-apple-accent shadow-sm space-y-1.5 transition-all">
+                            <div class="h-20 rounded-xl bg-[#FAF6EE] p-1.5 flex flex-col justify-between border border-black/5">
+                                <div class="flex gap-1 h-9">
+                                    <div class="w-7 bg-[#D8C7B2] rounded-sm"></div>
+                                    <div class="flex-1 space-y-1 py-1">
+                                        <div class="h-1 bg-black/25 rounded w-full"></div>
+                                        <div class="h-1 bg-black/15 rounded w-3/4"></div>
+                                    </div>
+                                </div>
+                                <div class="h-6 bg-[#E6D9C6] rounded-sm w-full"></div>
+                            </div>
+                            <div class="px-0.5">
+                                <p class="font-serif text-[11px] font-semibold text-apple-text">晨光错落</p>
+                                <p class="text-[9px] text-apple-sub">图文穿插叙事</p>
+                            </div>
+                        </button>
+
+                        <button onclick="selectAIPresetProposal('scrapbook')" id="ts-scrapbook" class="group text-left bg-white p-2 rounded-2xl border-2 border-transparent shadow-sm space-y-1.5 transition-all">
+                            <div class="h-20 rounded-xl bg-[#F3ECE0] p-1.5 relative overflow-hidden border border-black/5 flex items-center justify-center">
+                                <div class="w-12 h-14 bg-white p-1 rounded shadow transform -rotate-3 relative">
+                                    <div class="w-5 h-1.5 bg-[#E2CFA9] mx-auto -mt-1.5 mb-0.5 rounded-sm"></div>
+                                    <div class="w-full h-8 bg-[#C67D5A]/35 rounded-xs"></div>
+                                    <div class="h-1 bg-black/20 rounded w-4/5 mt-1"></div>
+                                </div>
+                                <div class="w-10 h-11 bg-[#FFFDF8] p-1 rounded shadow transform rotate-6 -ml-2 mt-3 border border-black/5">
+                                    <div class="h-1 bg-black/25 rounded w-full mt-1"></div>
+                                    <div class="h-1 bg-black/15 rounded w-2/3 mt-1"></div>
+                                </div>
+                            </div>
+                            <div class="px-0.5">
+                                <p class="font-serif text-[11px] font-semibold text-apple-text">纸条拼贴</p>
+                                <p class="text-[9px] text-apple-sub">胶带纸条压图</p>
+                            </div>
+                        </button>
+
+                        <button onclick="selectAIPresetProposal('illustrated')" id="ts-illustrated" class="group text-left bg-white p-2 rounded-2xl border-2 border-transparent shadow-sm space-y-1.5 transition-all">
+                            <div class="h-20 rounded-xl bg-[#F4F6F0] p-1.5 relative overflow-hidden border border-black/5 flex flex-col justify-between">
+                                <svg class="w-6 h-6 text-[#6B8E78] self-end -mb-2 opacity-80" viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.8">
+                                    <path d="M6 26 C10 18 18 14 26 6 M18 8 C20 12 22 14 26 14" stroke-linecap="round"/>
+                                </svg>
+                                <div class="w-4/5 h-9 bg-[#CBD8C8] rounded-lg mx-auto"></div>
+                                <div class="h-2 bg-white/80 rounded px-1 flex items-center">
+                                    <div class="h-1 bg-[#4B6353]/40 rounded w-2/3"></div>
+                                </div>
+                            </div>
+                            <div class="px-0.5">
+                                <p class="font-serif text-[11px] font-semibold text-apple-text">水彩插画</p>
+                                <p class="text-[9px] text-apple-sub">手绘植物伴读</p>
+                            </div>
+                        </button>
+                    </div>
+
+                    <!-- 自然语言输入入口 + 传参考图 -->
+                    <div class="bg-white rounded-2xl p-2 border border-black/[0.05] flex items-center space-x-1.5">
+                        <button onclick="simulateReferenceUpload()" class="shrink-0 px-2.5 py-1.5 rounded-xl bg-apple-bg text-apple-text text-[10px] font-medium flex items-center space-x-1" title="上传参考排版">
+                            <i data-lucide="image" class="w-3 h-3 text-apple-accent"></i>
+                            <span>传参考图</span>
+                        </button>
+                        <input id="ai-custom-prompt" onkeydown="if(event.key==='Enter') applyCustomPromptDirection(this.value)" type="text" placeholder="输入想法（如：暗房胶片感、文字浮在图上）" class="flex-1 bg-transparent text-[11px] text-apple-text placeholder:text-apple-sub focus:outline-none px-1">
+                        <button onclick="applyCustomPromptDirection(document.getElementById('ai-custom-prompt').value)" class="px-3 py-1.5 rounded-xl bg-apple-accent text-white text-[11px] font-semibold shrink-0">生成</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 子抽屉：增减素材 -->
+            <div id="fragment-manager-sheet" class="hidden absolute inset-x-0 bottom-0 bg-[#F7F5F0] rounded-t-3xl z-40 h-[74%] flex flex-col shadow-2xl">
+                <div class="p-3 flex items-center space-x-2 border-b border-black/[0.05] shrink-0">
+                    <div class="relative flex-1">
+                        <i data-lucide="search" class="w-3.5 h-3.5 text-apple-sub absolute left-2.5 top-2"></i>
+                        <input id="sheet-frag-search" oninput="renderFragmentManagerList()" type="text" placeholder="搜地点、内容" class="w-full bg-white text-[11px] rounded-xl pl-8 pr-3 py-1.5 border border-black/[0.06] focus:outline-none">
+                    </div>
+                    <button onclick="closeFragmentManagerSheet()" class="text-[11px] font-semibold text-apple-accent px-1 shrink-0">完成</button>
+                </div>
+                <div id="sheet-frag-list" class="flex-1 overflow-y-auto no-scrollbar p-3 space-y-2"></div>
+            </div>
+
+            <!-- 子抽屉：双源换图 -->
+            <div id="photo-replace-sheet" class="hidden absolute inset-x-0 bottom-0 bg-white rounded-t-3xl p-4 shadow-2xl z-40 space-y-3 max-h-[68%] flex flex-col">
+                <div class="flex items-center justify-between">
+                    <span class="font-serif text-xs font-semibold text-apple-text">换一张照片</span>
+                    <button onclick="closePhotoReplaceSheet()" class="text-xs text-apple-sub">取消</button>
+                </div>
+                <div class="flex bg-[#F2F0EA] p-0.5 rounded-xl text-[11px] font-medium">
+                    <button onclick="switchReplaceSourceTab('app')" id="rep-tab-app" class="flex-1 py-1.5 rounded-lg bg-white text-apple-text shadow-sm">素材库</button>
+                    <button onclick="switchReplaceSourceTab('phone')" id="rep-tab-phone" class="flex-1 py-1.5 rounded-lg text-apple-sub">手机相册</button>
+                </div>
+                <div id="replace-photo-grid" class="grid grid-cols-3 gap-2 overflow-y-auto no-scrollbar flex-1 py-1"></div>
+            </div>
+
+            <!-- AI 分阶段生成加载态 -->
+            <div id="studio-ai-loading" class="hidden absolute inset-0 bg-[#EDEAE2]/96 ios-blur z-[45] flex-col items-center justify-center space-y-4">
+                <div class="w-14 h-14 rounded-full bg-apple-accentLight flex items-center justify-center shadow-sm">
+                    <i data-lucide="sparkles" class="w-6 h-6 text-apple-accent animate-pulse"></i>
+                </div>
+                <div class="text-center space-y-1 px-8">
+                    <p id="ai-loading-step" class="font-serif text-sm font-semibold text-apple-text">正在读取照片光影与色彩…</p>
+                    <p class="text-[10px] text-apple-sub">AI 排版引擎工作中，通常需要 2-4 秒</p>
+                </div>
+                <div class="w-44 h-1 bg-black/10 rounded-full overflow-hidden">
+                    <div id="ai-loading-bar" class="h-full bg-apple-accent rounded-full transition-all duration-500" style="width: 12%"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ==================== 模态框 2：画册翻书阅读器 ==================== -->
+        <div id="book-reader-modal" class="absolute inset-0 bg-[#F4F1EA] z-50 flex-col justify-between p-4 hidden">
+            <div class="flex items-center justify-between text-apple-text pt-2 px-1 shrink-0 border-b border-black/[0.05] pb-2.5">
+                <button onclick="closeBookReader()" class="text-xs text-apple-sub hover:text-apple-text flex items-center space-x-0.5">
+                    <i data-lucide="chevron-left" class="w-4 h-4"></i><span>书架</span>
+                </button>
+                <div class="text-center">
+                    <h3 id="reader-book-title" class="font-serif text-xs font-semibold text-apple-text">《日常周记》</h3>
+                    <span id="reader-page-indicator" class="text-[10px] text-apple-sub">1 / 3 · 2026.11.04</span>
+                </div>
+                <div class="flex items-center space-x-1.5">
+                    <button onclick="toggleReaderGridOverview()" class="text-[11px] bg-black/[0.06] text-apple-text px-2.5 py-1 rounded-full">目录</button>
+                    <button onclick="openShareSheetFromReader()" class="text-[11px] bg-black/[0.06] text-apple-text px-2.5 py-1 rounded-full flex items-center space-x-1">
+                        <i data-lucide="share" class="w-3 h-3"></i><span>分享</span>
+                    </button>
+                    <button id="reader-edit-btn" class="text-[11px] bg-apple-accent text-white px-2.5 py-1 rounded-full font-medium">重排</button>
+                </div>
+            </div>
+
+            <div id="reader-single-view" class="flex-1 flex items-center justify-center my-2 overflow-y-auto no-scrollbar">
+                <div id="reader-rendered-page" class="w-full rounded-3xl overflow-hidden shadow-lg border border-black/[0.05]"></div>
+            </div>
+
+            <div id="reader-grid-overview" class="flex-1 my-3 overflow-y-auto no-scrollbar space-y-3 hidden">
+                <div id="reader-pages-grid" class="grid grid-cols-2 gap-3"></div>
+            </div>
+
+            <div class="space-y-2 shrink-0 pt-1 border-t border-black/[0.05]">
+                <div id="reader-thumbnails-strip" class="flex items-center justify-center space-x-2 overflow-x-auto no-scrollbar py-1"></div>
+                <div class="flex items-center justify-between px-1">
+                    <button onclick="turnAlbumPage(-1)" class="px-3.5 py-1.5 rounded-full bg-white text-apple-text border border-black/[0.06] text-xs font-medium shadow-sm">上一页</button>
+                    <button onclick="addNewPageToCurrentAlbum()" class="px-3.5 py-1.5 rounded-full bg-apple-accentLight text-apple-accent text-xs font-semibold">+ 新一页</button>
+                    <button onclick="turnAlbumPage(1)" class="px-3.5 py-1.5 rounded-full bg-apple-text text-white text-xs font-semibold shadow-sm">下一页</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ==================== 模态框 3：全屏高清大图/实况查看器 ==================== -->
+        <div id="media-lightbox-modal" onclick="closeMediaLightbox()" class="hidden absolute inset-0 bg-black/95 ios-blur z-50 flex-col justify-between p-4 text-white cursor-zoom-out">
+            <div class="flex items-center justify-between pt-2" onclick="event.stopPropagation()">
+                <div class="flex items-center space-x-2">
+                    <span id="lightbox-meta-title" class="text-xs font-medium">安福路咖啡</span>
+                    <span id="lightbox-meta-sub" class="text-[11px] text-white/50">11月4日 09:42</span>
+                </div>
+                <button onclick="closeMediaLightbox()" class="w-8 h-8 rounded-full bg-white/15 flex items-center justify-center">
+                    <i data-lucide="x" class="w-4 h-4"></i>
+                </button>
+            </div>
+
+            <div class="flex-1 flex flex-col items-center justify-center relative my-2 overflow-hidden" onclick="event.stopPropagation()">
+                <div id="lightbox-live-badge" class="hidden absolute top-3 left-3 z-20 bg-black/60 ios-blur text-amber-300 text-[10px] font-semibold px-2.5 py-1 rounded-full flex items-center space-x-1.5">
+                    <span class="w-2 h-2 rounded-full bg-amber-400 animate-ping"></span>
+                    <span>LIVE 实况照片</span>
+                </div>
+                <img id="lightbox-main-img" src="" class="max-h-[520px] w-full object-contain rounded-xl transition-transform duration-500">
+                <div id="lightbox-thumbs" class="flex space-x-2 mt-3"></div>
+            </div>
+
+            <div class="pb-2 text-center" onclick="event.stopPropagation()">
+                <p id="lightbox-caption" class="font-serif text-xs text-white/80 leading-relaxed max-w-xs mx-auto"></p>
+            </div>
+        </div>
+
+        <!-- ==================== 模态框 4：装订入册 ==================== -->
+        <div id="album-picker-sheet" class="hidden absolute inset-0 bg-black/40 z-50 flex-col justify-end">
+            <div class="bg-[#F7F5F0] rounded-t-3xl p-4 space-y-3 max-h-[72%] flex flex-col shadow-2xl">
+                <div class="flex items-center justify-between shrink-0">
+                    <span class="font-serif text-[13px] font-semibold text-apple-text">装订到画册</span>
+                    <button onclick="closeAlbumPicker()" class="text-[11px] text-apple-sub">取消</button>
+                </div>
+                <div id="album-picker-list" class="space-y-2 overflow-y-auto no-scrollbar"></div>
+                <button onclick="createNewAlbumBookPrompt(); closeAlbumPicker()" class="w-full py-2.5 rounded-2xl border border-dashed border-black/15 text-[11px] text-apple-sub shrink-0">＋ 新建一本画册</button>
+            </div>
+        </div>
+
+        <!-- ==================== 模态框 5：导出分享 ==================== -->
+        <div id="share-sheet-modal" class="hidden absolute inset-0 bg-black/40 z-50 flex-col justify-end">
+            <div class="bg-[#F7F5F0] rounded-t-3xl p-4 space-y-3 shadow-2xl">
+                <div class="flex items-center space-x-3 min-w-0">
+                    <img id="share-preview-thumb" src="" class="w-10 h-12 rounded-lg object-cover border border-black/10 shrink-0">
+                    <div class="min-w-0 flex-1">
+                        <p class="text-[9px] tracking-[0.18em] text-apple-accent font-semibold">READY TO SHARE</p>
+                        <p id="share-preview-title" class="font-serif text-[12px] font-semibold text-apple-text truncate mt-0.5"></p>
+                    </div>
+                    <button onclick="closeShareSheet()" class="w-7 h-7 rounded-full bg-black/5 flex items-center justify-center shrink-0">
+                        <i data-lucide="x" class="w-3.5 h-3.5 text-apple-sub"></i>
+                    </button>
+                </div>
+
+                <div class="flex bg-black/[0.055] rounded-full p-[3px] text-[11px] font-medium text-apple-sub">
+                    <button onclick="switchShareCopyStyle('xhs')" id="copy-tab-xhs" class="flex-1 py-1.5 rounded-full bg-white text-apple-text shadow-sm">小红书</button>
+                    <button onclick="switchShareCopyStyle('moments')" id="copy-tab-moments" class="flex-1 py-1.5 rounded-full">朋友圈</button>
+                </div>
+
+                <textarea id="share-copywriting-box" rows="4" class="w-full bg-white rounded-2xl p-3 text-[11px] leading-relaxed text-apple-text border border-black/[0.06] focus:outline-none resize-none"></textarea>
+
+                <div class="flex space-x-2">
+                    <button onclick="saveRenderedImageToPhone()" id="btn-save-img" class="flex-1 py-2.5 rounded-2xl bg-apple-text text-white text-[11px] font-semibold flex items-center justify-center space-x-1">
+                        <i data-lucide="download" class="w-3.5 h-3.5"></i><span>存图</span>
+                    </button>
+                    <button onclick="copyAndRemindPlatform()" class="flex-1 py-2.5 rounded-2xl bg-apple-accent text-white text-[11px] font-semibold">复制文案并保存</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 轻提示 Toast -->
+        <div id="toast-msg" class="hidden absolute top-14 left-1/2 -translate-x-1/2 bg-[#1C1C1E]/90 text-white text-xs px-4 py-2 rounded-full shadow-lg z-50 transition-all"></div>
+    </div>
+
+    <script>
+        // ==================== 1. 核心数据底座 ====================
+        const samplePhotoPool = [
+            'https://images.unsplash.com/photo-1509042239860-f550ce710b93?auto=format&fit=crop&w=800&q=80',
+            'https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&w=800&q=80',
+            'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=800&q=80',
+            'https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba?auto=format&fit=crop&w=800&q=80',
+            'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?auto=format&fit=crop&w=800&q=80',
+            'https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=800&q=80',
+            'https://images.unsplash.com/photo-1513519245088-0e12902e5a38?auto=format&fit=crop&w=800&q=80'
+        ];
+
+        const periodSortMap = {
+            '清晨': 420,
+            '上午': 600,
+            '午后': 870,
+            '傍晚': 1110,
+            '深夜': 1350,
+            '': 720
+        };
+
+        let fragments = [
+            {
+                id: 'f6', year: 2026, monthKey: 11, dayNum: 4,
+                dateGroup: '今天 · 11月4日', isToday: true,
+                time: '23:10', fuzzyPeriod: '深夜', sortMinutes: 1390,
+                location: '武康路自宅阳台',
+                mapX: 55, mapY: 25, range: 'week',
+                type: 'text-only',
+                images: [],
+                text: '降温的第一天，把夏天的衣服收进箱子。有些季节结束得很安静，连一句告别都没有。',
+                albumId: null, pageId: null
+            },
+            {
+                id: 'f2', year: 2026, monthKey: 11, dayNum: 4,
+                dateGroup: '今天 · 11月4日', isToday: true,
+                time: '18:30', fuzzyPeriod: '傍晚', sortMinutes: 1110,
+                location: '徐汇滨江',
+                mapX: 62, mapY: 58, range: 'week',
+                type: 'live-mixed',
+                images: [samplePhotoPool[2]],
+                hasLiveVideo: true,
+                text: '下班路过江边，紫红色的晚霞铺满江面，吹了十分钟晚风。',
+                albumId: 'album_weekly', pageId: 'page_w1'
+            },
+            {
+                id: 'f1', year: 2026, monthKey: 11, dayNum: 4,
+                dateGroup: '今天 · 11月4日', isToday: true,
+                time: '09:42', fuzzyPeriod: '', sortMinutes: 582,
+                location: '安福路 Baker & Spice',
+                mapX: 48, mapY: 42, range: 'week',
+                type: 'multi-photo',
+                images: [samplePhotoPool[0], samplePhotoPool[1]],
+                text: '早起赶方案，买到了刚出炉的肉桂卷。热拿铁端上来的瞬间觉得今天还能再战。',
+                albumId: 'album_weekly', pageId: 'page_w1'
+            },
+            {
+                id: 'f3', year: 2026, monthKey: 11, dayNum: 3,
+                dateGroup: '昨天 · 11月3日', isToday: false,
+                time: '21:15', fuzzyPeriod: '深夜', sortMinutes: 1275,
+                location: '富民路小酒馆',
+                mapX: 35, mapY: 36, range: 'month',
+                type: 'photo-note',
+                images: [samplePhotoPool[4]],
+                text: '和林林聊到深夜，辣肉面配冰镇梅子酒，把积攒半个月的烦心事全倒空了。',
+                albumId: 'album_people', pageId: 'page_p1'
+            },
+            {
+                id: 'f4', year: 2026, monthKey: 10, dayNum: 19,
+                dateGroup: '10月19日', isToday: false,
+                time: '午后', fuzzyPeriod: '午后', sortMinutes: 870,
+                location: '大理洱海廊桥',
+                mapX: 22, mapY: 68, range: 'all',
+                type: 'multi-photo',
+                images: [samplePhotoPool[5], samplePhotoPool[6]],
+                text: '洱海边的风把书页吹得哗哗响，什么都不想的下午太奢侈了。',
+                albumId: 'album_travel', pageId: 'page_t1'
+            },
+            {
+                id: 'f5', year: 2025, monthKey: 9, dayNum: 15,
+                dateGroup: '2025年 9月15日', isToday: false,
+                time: '午后', fuzzyPeriod: '午后', sortMinutes: 850,
+                location: '复兴公园草坪',
+                mapX: 74, mapY: 30, range: 'all',
+                type: 'photo-note',
+                images: [samplePhotoPool[3]],
+                text: '公园长椅下偶遇晒太阳的小橘猫，完全不怕生。',
+                albumId: null, pageId: null
+            }
+        ];
+
+        let albumBooks = [
+            {
+                id: 'album_weekly',
+                title: '日常周记',
+                subtitle: '每周生活高光与情绪切片',
+                cover: samplePhotoPool[0],
+                spineColor: '#C67D5A',
+                pages: [
+                    {
+                        id: 'page_w1',
+                        dateStr: '2026.11.04',
+                        title: '在热拿铁与滨江晚霞之间，重来的一天',
+                        bodyText: '早起赶方案，买到了刚出炉的肉桂卷。下班路过江边，紫红色的晚霞铺满江面。',
+                        theme: 'kinfolk',
+                        format: 'long',
+                        fragmentIds: ['f1', 'f2']
+                    },
+                    {
+                        id: 'page_w2',
+                        dateStr: '2025.09.15',
+                        title: '公园长椅下的橘色温柔',
+                        bodyText: '公园长椅下偶遇晒太阳的小橘猫，完全不怕生。',
+                        theme: 'scrapbook',
+                        format: 'long',
+                        fragmentIds: ['f5']
+                    }
+                ]
+            },
+            {
+                id: 'album_travel',
+                title: '旅途漫游',
+                subtitle: '山海与远方连载册',
+                cover: samplePhotoPool[5],
+                spineColor: '#3B6E8C',
+                pages: [
+                    {
+                        id: 'page_t1',
+                        dateStr: '2026.10.19',
+                        title: '苍山洱海边的散漫下午',
+                        bodyText: '洱海边的风把书页吹得哗哗响，什么都不想的下午太奢侈了。',
+                        theme: 'kinfolk',
+                        format: 'long',
+                        fragmentIds: ['f4']
+                    }
+                ]
+            },
+            {
+                id: 'album_people',
+                title: '与重要的人',
+                subtitle: '朋友与爱人的相聚时刻',
+                cover: samplePhotoPool[4],
+                spineColor: '#7E6B8F',
+                pages: [
+                    {
+                        id: 'page_p1',
+                        dateStr: '2026.11.03',
+                        title: '富民路深夜的梅子酒与真心话',
+                        bodyText: '和林林聊到深夜，辣肉面配冰镇梅子酒，把积攒半个月的烦心事全倒空了。',
+                        theme: 'amber_film',
+                        format: 'long',
+                        fragmentIds: ['f3']
+                    }
+                ]
+            },
+            {
+                id: 'album_food',
+                title: '味蕾食光',
+                subtitle: '被碳水与热汤治愈的瞬间',
+                cover: samplePhotoPool[1],
+                spineColor: '#B8860B',
+                pages: [
+                    {
+                        id: 'page_f1',
+                        dateStr: '2026.11.04',
+                        title: '刚出炉的肉桂卷与热汤面',
+                        bodyText: '唯有热腾腾的食物从不辜负早起与熬夜的人。',
+                        theme: 'illustrated',
+                        format: 'long',
+                        fragmentIds: ['f1', 'f3']
+                    }
+                ]
+            }
+        ];
+
+        const smartClustersData = {
+            people: [
+                { title: '与林林的聚会 (8次)', desc: '跨越半年的深夜食堂与下午茶', ids: ['f3', 'f1'], targetAlbum: 'album_people' }
+            ],
+            place: [
+                { title: '徐汇滨江散步线 (5次)', desc: '每次都在傍晚 18:00 左右出现', ids: ['f2', 'f5'], targetAlbum: 'album_weekly' }
+            ],
+            mood: [
+                { title: '咖啡与碳水急救 (11次)', desc: '高强度工作日的味蕾慰藉', ids: ['f1', 'f3'], targetAlbum: 'album_food' }
+            ]
+        };
+
+        // 全局状态
+        let selectedIds = new Set();
+        let onlyUncurated = false;
+        let currentSearchQuery = '';
+        let pickerYear = 2026;
+        let pickerMonth = 11;
+        let filterDateMode = 'all';
+        let filterDayNum = null;
+        let currentMapRange = 'all';
+        let pendingUploadImages = [];
+        let editingFragmentId = null;
+        let editingFuzzyPeriod = '';
+        let editingPageRef = null;
+        let pendingAlbumTargetId = null;
+        let currentMainTab = 'fragments';
+        let galleryFilterMode = 'all';
+
+        const autoContextPresets = [
+            { location: '安福路街角', weather: '19°C 微风', label: '安福路街角 · 19°C 微风' },
+            { location: '徐汇滨江', weather: '18°C 暮色晚霞', label: '徐汇滨江 · 18°C 暮色晚霞' },
+            { location: '静安寺写字楼', weather: '21°C 晴朗', label: '静安寺写字楼 · 21°C 晴朗' },
+            { location: '武康路自宅阳台', weather: '17°C 桂花香', label: '武康路自宅阳台 · 17°C 桂花香' }
+        ];
+        let currentContextPresetIdx = 0;
+
+        let studioState = {
+            theme: 'kinfolk',
+            format: 'long',
+            currentPageIdx: 0,
+            layoutSeed: 0,
+            customBgStyle: '',
+            customTitle: '',
+            storyBlocks: [],
+            activeBlockIdx: null,
+            activePhotoSubIdx: null,
+            activeTextBlockIdx: null,
+            aiNote: '',
+            replaceSourceTab: 'app'
+        };
+
+        let dragState = {
+            mode: null,
+            active: false,
+            blockIdx: null,
+            photoIdx: null,
+            startX: 0,
+            startY: 0,
+            initialPosX: 50,
+            initialPosY: 50
+        };
+
+        let readingAlbum = null;
+        let readingPageIndex = 0;
+
+        // ==================== 2. 穿插式手账图文引擎 ====================
+        const aiCreativeThemes = {
+            kinfolk: {
+                name: '晨光错落',
+                bg: 'bg-[#FDFBF7]', text: 'text-[#231F1D]', border: 'border-black/10',
+                badge: 'FRAMENOTE JOURNAL',
+                desc: '晨光错落'
+            },
+            scrapbook: {
+                name: '纸条拼贴',
+                bg: 'bg-[#F5F0E6]', text: 'text-[#2C2520]', border: 'border-[#DFD5C5]',
+                badge: 'HANDMADE SCRAPBOOK',
+                desc: '纸条拼贴'
+            },
+            illustrated: {
+                name: '水彩插画',
+                bg: 'bg-[#F4F6F0]', text: 'text-[#232D26]', border: 'border-[#D5DEC9]',
+                badge: 'BOTANICAL ILLUSTRATION',
+                desc: '水彩插画'
+            },
+            amber_film: {
+                name: '暗房胶片',
+                bg: 'bg-[#181716]', text: 'text-[#F5F2EB]', border: 'border-white/15',
+                badge: '● KODAK PORTRA 400',
+                desc: '暗房胶片'
+            }
+        };
+
+        function getBotanicalIllustrationSVG(idx) {
+            if (idx % 2 === 0) {
+                return `<svg class="w-12 h-12 text-[#6A8D73] opacity-75 pointer-events-none" viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round">
+                    <path d="M14 52 C24 38 36 26 50 12" />
+                    <path d="M24 40 C18 34 18 26 26 24 C28 30 26 36 24 40 Z" fill="rgba(142,176,149,0.28)"/>
+                    <path d="M36 28 C42 24 48 26 48 32 C42 34 38 32 36 28 Z" fill="rgba(142,176,149,0.28)"/>
+                    <path d="M30 22 C26 16 28 10 34 10 C36 15 34 20 30 22 Z" fill="rgba(198,125,90,0.22)"/>
+                </svg>`;
+            }
+            return `<svg class="w-11 h-11 text-[#C67D5A] opacity-70 pointer-events-none" viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round">
+                <circle cx="32" cy="32" r="14" fill="rgba(235,190,155,0.28)" stroke-dasharray="2 3"/>
+                <path d="M20 44 Q32 38 44 44 M24 49 Q32 46 40 49"/>
+            </svg>`;
+        }
+
+        function getPhotoInlineStyle(p) {
+            const x = p.posX !== undefined ? p.posX : 50;
+            const y = p.posY !== undefined ? p.posY : 50;
+            const s = p.scale !== undefined ? p.scale : 1;
+            return `object-position: ${x}% ${y}%; transform: scale(${s}); transform-origin: ${x}% ${y}%;`;
+        }
+
+        function buildStoryBlocksFromFragments(list, seed = 0) {
+            const textStyles = ['side-by-side', 'tape-float', 'note-below', 'caption-in'];
+            return (list || []).map((f, idx) => {
+                const photos = (f.images || []).map(u => ({ url: u, posX: 50, posY: 50, scale: 1 }));
+                const tStyle = photos.length === 0 ? 'note-below' : textStyles[(idx + seed) % textStyles.length];
+                return {
+                    id: 'blk_' + f.id,
+                    fragId: f.id,
+                    timeStr: f.fuzzyPeriod || f.time || '',
+                    locStr: f.location || '',
+                    text: f.text || '',
+                    showText: Boolean(f.text),
+                    textStyle: tStyle,
+                    photos: photos
+                };
+            });
+        }
+
+        // 顶层悬浮胶囊（脱离小图容器限制，永不裁切或换行，按上下文动态裁剪可用按钮）
+        function renderBlockTopHUD(blk, bIdx) {
+            const isPhotoActive = studioState.activeBlockIdx === bIdx && studioState.activePhotoSubIdx !== null;
+            const isTextActive = studioState.activeTextBlockIdx === bIdx;
+            if (!isPhotoActive && !isTextActive) return '';
+
+            const canMoveUp = bIdx > 0;
+            const totalBlocks = (studioState.storyBlocks || []).filter(b => (b.photos && b.photos.length > 0) || (b.showText && b.text)).length;
+
+            // 1. 点击图片时的精简顶层工具条
+            if (isPhotoActive) {
+                const pIdx = studioState.activePhotoSubIdx;
+                const photo = blk.photos?.[pIdx];
+                if (!photo) return '';
+                const zoomVal = photo.scale || 1;
+                return `
+                <div onclick="event.stopPropagation()" onmousedown="event.stopPropagation()" ontouchstart="event.stopPropagation()"
+                     class="absolute -top-11 left-1/2 -translate-x-1/2 z-50 bg-[#1C1C1E]/95 ios-blur text-white rounded-full px-3 py-1.5 shadow-[0_10px_28px_rgba(0,0,0,0.28)] border border-white/10 flex items-center space-x-2 text-[11px] whitespace-nowrap">
+                    <span class="text-[9px] text-white/55">缩放</span>
+                    <input oninput="handlePhotoZoom(this.value)" type="range" min="1" max="2.2" step="0.05" value="${zoomVal}" class="w-14 accent-[#C67D5A] h-1 bg-white/25 rounded-lg cursor-pointer">
+                    <span class="text-white/20">|</span>
+                    <button onclick="openPhotoReplaceSheetForActive()" class="px-1.5 py-0.5 rounded-full hover:bg-white/15 font-medium">换图</button>
+                    ${canMoveUp ? `<button onclick="moveBlockOrder(${bIdx}, -1)" class="px-1.5 py-0.5 rounded-full hover:bg-white/15">↑上移</button>` : ''}
+                    <button onclick="removeActiveBlockItem()" class="px-1.5 py-0.5 rounded-full text-red-300 hover:bg-red-500/20">删除</button>
+                </div>`;
+            }
+
+            // 2. 点击文字时的上下文感知顶层工具条
+            const photoCount = blk.photos ? blk.photos.length : 0;
+            const curStyle = blk.textStyle || 'note-below';
+
+            // 情况 A：纯文字块（没有图片，不显示任何图文位置切换按钮）
+            if (photoCount === 0) {
+                if (!canMoveUp && totalBlocks <= 1) return '';
+                return `
+                <div onclick="event.stopPropagation()"
+                     class="absolute -top-10 left-1/2 -translate-x-1/2 z-50 bg-[#1C1C1E]/95 ios-blur text-white rounded-full px-3 py-1 shadow-[0_10px_28px_rgba(0,0,0,0.28)] border border-white/10 flex items-center space-x-2 text-[11px] whitespace-nowrap">
+                    ${canMoveUp ? `<button onclick="moveBlockOrder(${bIdx}, -1)" class="px-1.5 py-0.5 rounded-full hover:bg-white/15">↑上移</button>` : ''}
+                    ${canMoveUp && totalBlocks > 1 ? `<span class="text-white/20">|</span>` : ''}
+                    ${totalBlocks > 1 ? `<button onclick="removeTextFromBlock(${bIdx})" class="px-1.5 py-0.5 rounded-full text-red-300">隐藏文字</button>` : ''}
+                </div>`;
+            }
+
+            // 情况 B：多图拼贴块（仅支持 贴图上 / 放图下 两种切换）
+            let styleOpts = [];
+            if (photoCount >= 2) {
+                styleOpts = [
+                    { k: 'tape-float', label: '贴图上' },
+                    { k: 'note-below', label: '放图下' }
+                ];
+            } else {
+                // 情况 C：单图配文（精简双字标签）
+                styleOpts = [
+                    { k: 'tape-float', label: '贴图' },
+                    { k: 'caption-in', label: '字幕' },
+                    { k: 'side-by-side', label: '伴读' },
+                    { k: 'note-below', label: '图下' }
+                ];
+            }
+
+            return `
+            <div onclick="event.stopPropagation()"
+                 class="absolute -top-10 left-1/2 -translate-x-1/2 z-50 bg-[#1C1C1E]/95 ios-blur text-white rounded-full px-2.5 py-1 shadow-[0_10px_28px_rgba(0,0,0,0.28)] border border-white/10 flex items-center space-x-1 text-[11px] whitespace-nowrap">
+                ${styleOpts.map(o => `
+                    <button onclick="setBlockTextStyle(${bIdx}, '${o.k}')" class="px-2 py-0.5 rounded-full transition-colors ${curStyle === o.k ? 'bg-apple-accent text-white font-semibold' : 'text-white/75 hover:text-white'}">${o.label}</button>
+                `).join('')}
+                ${canMoveUp ? `<span class="text-white/20">|</span><button onclick="moveBlockOrder(${bIdx}, -1)" class="px-1.5 py-0.5 rounded-full text-white/80 hover:text-white">↑</button>` : ''}
+                <span class="text-white/20">|</span>
+                <button onclick="removeTextFromBlock(${bIdx})" class="px-1.5 py-0.5 rounded-full text-red-300">隐藏</button>
+            </div>`;
+        }
+
+        function renderSingleStoryBlock(blk, bIdx, editable, themeKey) {
+            const isDark = themeKey === 'amber_film';
+            const isIllustrated = themeKey === 'illustrated';
+            const hasPhotos = blk.photos && blk.photos.length > 0;
+            const hasText = blk.showText && blk.text;
+            if (!hasPhotos && !hasText) return '';
+
+            const metaLine = [blk.timeStr, blk.locStr].filter(Boolean).join(' · ');
+            const tStyle = blk.textStyle || 'note-below';
+            const isBlockActive = editable && (studioState.activeBlockIdx === bIdx || studioState.activeTextBlockIdx === bIdx);
+            const activeZClass = isBlockActive ? 'z-40' : 'z-10';
+            const topHudHtml = editable ? renderBlockTopHUD(blk, bIdx) : '';
+
+            // 1. 纯文字块（无图）
+            if (!hasPhotos) {
+                const textSel = editable && studioState.activeTextBlockIdx === bIdx;
+                return `
+                <div onclick="event.stopPropagation(); activateTextHUD(${bIdx})"
+                     class="relative ${activeZClass} p-3.5 rounded-2xl border ${isDark ? 'bg-white/[0.06] border-white/10' : 'bg-white/90 border-black/[0.05]'} shadow-sm transition-all ${textSel ? 'ring-2 ring-apple-accent' : ''}">
+                    ${topHudHtml}
+                    <div class="w-9 h-3 washi-tape rounded-sm mx-auto -mt-5 mb-2"></div>
+                    ${metaLine ? `<p class="text-[9px] opacity-45 mb-1">${metaLine}</p>` : ''}
+                    <p ${editable ? `contenteditable="true" oninput="studioState.storyBlocks[${bIdx}].text=this.innerText"` : ''}
+                       class="font-serif text-[12px] leading-[1.8] focus:outline-none">${blk.text}</p>
+                </div>`;
+            }
+
+            // 2. 双图错落拼贴块
+            if (blk.photos.length >= 2) {
+                const p0 = blk.photos[0];
+                const p1 = blk.photos[1];
+                const sel0 = editable && studioState.activeBlockIdx === bIdx && studioState.activePhotoSubIdx === 0;
+                const sel1 = editable && studioState.activeBlockIdx === bIdx && studioState.activePhotoSubIdx === 1;
+                const textSel = editable && studioState.activeTextBlockIdx === bIdx;
+
+                return `
+                <div class="relative ${activeZClass} space-y-2">
+                    ${topHudHtml}
+                    <div class="grid grid-cols-12 gap-2 items-end relative">
+                        <div ${editable ? `onmousedown="startBlockPhotoDrag(event, ${bIdx}, 0)" ontouchstart="startBlockPhotoDrag(event, ${bIdx}, 0)"` : `onclick="openMediaLightboxFromUrl('${p0.url}', '${blk.locStr}')"`}
+                             class="col-span-7 bg-white p-1.5 pb-3 rounded-[8px] shadow-md transform -rotate-1 relative cursor-pointer ${sel0 ? 'ring-2 ring-apple-accent' : ''}">
+                            <div class="h-36 overflow-hidden rounded-[4px]">
+                                <img id="blk-img-${bIdx}-0" src="${p0.url}" draggable="false" style="${getPhotoInlineStyle(p0)}" class="w-full h-full object-cover pointer-events-none">
+                            </div>
+                        </div>
+                        <div ${editable ? `onmousedown="startBlockPhotoDrag(event, ${bIdx}, 1)" ontouchstart="startBlockPhotoDrag(event, ${bIdx}, 1)"` : `onclick="openMediaLightboxFromUrl('${p1.url}', '${blk.locStr}')"`}
+                             class="col-span-5 bg-white p-1.5 pb-3 rounded-[8px] shadow-md transform rotate-2 relative cursor-pointer ${sel1 ? 'ring-2 ring-apple-accent' : ''}">
+                            <div class="h-28 overflow-hidden rounded-[4px]">
+                                <img id="blk-img-${bIdx}-1" src="${p1.url}" draggable="false" style="${getPhotoInlineStyle(p1)}" class="w-full h-full object-cover pointer-events-none">
+                            </div>
+                        </div>
+                        ${isIllustrated ? `<div class="absolute -top-3 right-1 z-20">${getBotanicalIllustrationSVG(bIdx)}</div>` : ''}
+                    </div>
+                    ${hasText ? `
+                        <div onclick="event.stopPropagation(); activateTextHUD(${bIdx})"
+                             class="${tStyle === 'tape-float' ? '-mt-7 mx-3 relative z-20 bg-[#FFFDF9]/95 p-2.5 rounded-xl shadow-md border border-black/5' : 'px-1 pt-0.5 rounded-xl'} transition-all ${textSel ? 'ring-2 ring-apple-accent' : ''}">
+                            ${tStyle === 'tape-float' ? `<div class="w-8 h-2.5 washi-tape rounded-xs mx-auto -mt-4 mb-1.5"></div>` : ''}
+                            ${metaLine ? `<p class="text-[8.5px] opacity-45 mb-0.5">${metaLine}</p>` : ''}
+                            <p ${editable ? `contenteditable="true" oninput="studioState.storyBlocks[${bIdx}].text=this.innerText"` : ''}
+                               class="font-serif text-[11.5px] ${tStyle === 'tape-float' ? 'text-[#2B2520]' : ''} leading-[1.75] focus:outline-none">${blk.text}</p>
+                        </div>
+                    ` : ''}
+                </div>`;
+            }
+
+            // 3. 单图配文块
+            const p0 = blk.photos[0];
+            const sel0 = editable && studioState.activeBlockIdx === bIdx && studioState.activePhotoSubIdx === 0;
+            const textSel = editable && studioState.activeTextBlockIdx === bIdx;
+
+            if (tStyle === 'side-by-side' && hasText) {
+                const imgLeft = bIdx % 2 === 0;
+                return `
+                <div class="relative ${activeZClass} grid grid-cols-12 gap-3 items-center p-2.5 rounded-2xl border ${isDark ? 'bg-white/[0.05] border-white/10' : 'bg-white/80 border-black/[0.05]'}">
+                    ${topHudHtml}
+                    ${isIllustrated ? `<div class="absolute -top-3 ${imgLeft ? 'right-2' : 'left-2'} z-20">${getBotanicalIllustrationSVG(bIdx)}</div>` : ''}
+                    <div ${editable ? `onmousedown="startBlockPhotoDrag(event, ${bIdx}, 0)" ontouchstart="startBlockPhotoDrag(event, ${bIdx}, 0)"` : `onclick="openMediaLightboxFromUrl('${p0.url}', '${blk.locStr}')"`}
+                         class="col-span-5 ${imgLeft ? 'order-1 -rotate-1' : 'order-2 rotate-1'} bg-white p-1 pb-2.5 rounded-[7px] shadow relative cursor-pointer ${sel0 ? 'ring-2 ring-apple-accent' : ''}">
+                        <div class="h-28 overflow-hidden rounded-[4px]">
+                            <img id="blk-img-${bIdx}-0" src="${p0.url}" draggable="false" style="${getPhotoInlineStyle(p0)}" class="w-full h-full object-cover pointer-events-none">
+                        </div>
+                    </div>
+                    <div onclick="event.stopPropagation(); activateTextHUD(${bIdx})" class="col-span-7 ${imgLeft ? 'order-2' : 'order-1'} p-1.5 rounded-xl transition-all ${textSel ? 'ring-2 ring-apple-accent bg-apple-accent/5' : ''}">
+                        ${metaLine ? `<p class="text-[8.5px] opacity-45 mb-1">${metaLine}</p>` : ''}
+                        <p ${editable ? `contenteditable="true" oninput="studioState.storyBlocks[${bIdx}].text=this.innerText"` : ''}
+                           class="font-serif text-[11.5px] leading-[1.8] focus:outline-none">${blk.text}</p>
+                    </div>
+                </div>`;
+            }
+
+            if (tStyle === 'caption-in' && hasText) {
+                return `
+                <div class="relative ${activeZClass}">
+                    ${topHudHtml}
+                    <div class="relative rounded-2xl overflow-hidden shadow-md ${sel0 ? 'ring-2 ring-apple-accent' : ''}">
+                        <div ${editable ? `onmousedown="startBlockPhotoDrag(event, ${bIdx}, 0)" ontouchstart="startBlockPhotoDrag(event, ${bIdx}, 0)"` : `onclick="openMediaLightboxFromUrl('${p0.url}', '${blk.locStr}')"`}
+                             class="h-48 overflow-hidden relative cursor-pointer">
+                            <img id="blk-img-${bIdx}-0" src="${p0.url}" draggable="false" style="${getPhotoInlineStyle(p0)}" class="w-full h-full object-cover pointer-events-none">
+                            <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent pointer-events-none"></div>
+                        </div>
+                        <div onclick="event.stopPropagation(); activateTextHUD(${bIdx})" class="absolute bottom-0 inset-x-0 p-3 text-white transition-all ${textSel ? 'bg-black/35 ring-2 ring-inset ring-apple-accent rounded-b-2xl' : ''}">
+                            ${metaLine ? `<p class="text-[8.5px] text-white/65 tracking-wider mb-0.5">${metaLine}</p>` : ''}
+                            <p ${editable ? `contenteditable="true" oninput="studioState.storyBlocks[${bIdx}].text=this.innerText"` : ''}
+                               class="font-serif text-[12px] leading-relaxed text-white/95 focus:outline-none">${blk.text}</p>
+                        </div>
+                    </div>
+                </div>`;
+            }
+
+            const isTapeFloat = (tStyle === 'tape-float' || themeKey === 'scrapbook');
+            return `
+            <div class="relative ${activeZClass} ${isTapeFloat ? 'pb-2' : 'bg-white/95 text-[#231F1D] p-2.5 pb-3.5 rounded-[12px] shadow-md'}">
+                ${topHudHtml}
+                <div class="w-11 h-3 washi-tape rounded-sm absolute -top-1.5 left-1/2 -translate-x-1/2 z-20"></div>
+                ${isIllustrated ? `<div class="absolute -top-3 right-2 z-20">${getBotanicalIllustrationSVG(bIdx)}</div>` : ''}
+                <div ${editable ? `onmousedown="startBlockPhotoDrag(event, ${bIdx}, 0)" ontouchstart="startBlockPhotoDrag(event, ${bIdx}, 0)"` : `onclick="openMediaLightboxFromUrl('${p0.url}', '${blk.locStr}')"`}
+                     class="h-44 rounded-[8px] overflow-hidden relative shadow-sm cursor-pointer ${sel0 ? 'ring-2 ring-apple-accent' : ''}">
+                    <img id="blk-img-${bIdx}-0" src="${p0.url}" draggable="false" style="${getPhotoInlineStyle(p0)}" class="w-full h-full object-cover pointer-events-none">
+                </div>
+                ${hasText ? `
+                    <div onclick="event.stopPropagation(); activateTextHUD(${bIdx})"
+                         class="${isTapeFloat ? '-mt-6 ml-6 mr-2 relative z-20 bg-[#FFFDF8]/95 text-[#26211D] p-2.5 rounded-xl shadow-md border border-black/[0.06] transform rotate-[0.8deg]' : 'mt-2.5 p-1 rounded-xl'} transition-all ${textSel ? 'ring-2 ring-apple-accent' : ''}">
+                        ${isTapeFloat ? `<div class="w-7 h-2 washi-tape rounded-xs -mt-3.5 mb-1"></div>` : ''}
+                        ${metaLine ? `<p class="text-[8.5px] opacity-45 mb-0.5">${metaLine}</p>` : ''}
+                        <p ${editable ? `contenteditable="true" oninput="studioState.storyBlocks[${bIdx}].text=this.innerText"` : ''}
+                           class="font-serif text-[12px] leading-[1.75] focus:outline-none">${blk.text}</p>
+                    </div>
+                ` : ''}
+            </div>`;
+        }
+
+        function buildRenderedPosterHTML(config) {
+            const list = config.fragments || [fragments[0]];
+            const themeKey = config.theme || 'kinfolk';
+            const themeObj = aiCreativeThemes[themeKey] || aiCreativeThemes.kinfolk;
+            const editable = !!config.editable;
+            const format = config.format || (editable ? studioState.format : 'long');
+            const blocks = config.storyBlocks || buildStoryBlocksFromFragments(list, studioState.layoutSeed);
+            const activeBlocks = blocks.filter(b => (b.photos && b.photos.length > 0) || (b.showText && b.text));
+
+            const cardId = editable ? 'poster-inner-card' : 'reader-inner-card';
+            const customStyleAttr = config.customBgStyle ? `style="${config.customBgStyle}"` : '';
+            const dateStr = config.dateStr || '2026.11.04';
+            const title = config.title || '拾起散落在今日的温柔切片';
+
+            if (format === 'pages') {
+                const totalP = Math.max(1, activeBlocks.length);
+                const curIdx = Math.min(studioState.currentPageIdx || 0, totalP - 1);
+                const curBlk = activeBlocks[curIdx] || activeBlocks[0];
+                const realIdx = blocks.indexOf(curBlk);
+
+                return `
+                <div class="space-y-2.5">
+                    <div id="${cardId}" ${customStyleAttr} class="${themeObj.bg} ${themeObj.text} rounded-[22px] p-4 border ${themeObj.border} shadow-lg min-h-[400px] flex flex-col justify-between relative">
+                        <div class="flex items-center justify-between text-[8px] tracking-[0.22em] opacity-45">
+                            <span>${themeObj.badge}</span>
+                            <span>${curIdx + 1} / ${totalP}</span>
+                        </div>
+                        <div class="my-auto py-3">
+                            ${curBlk ? renderSingleStoryBlock(curBlk, realIdx, editable, themeKey) : ''}
+                        </div>
+                        <div class="flex items-center justify-between text-[9px] opacity-45 pt-2 border-t border-current/10">
+                            <span class="font-serif truncate max-w-[190px]">${title}</span>
+                            <span>${dateStr}</span>
+                        </div>
+                    </div>
+                    <div class="flex items-center justify-center space-x-2">
+                        <button onclick="event.stopPropagation(); stepStudioPage(-1)" class="px-2.5 py-1 rounded-full bg-white/80 text-[10px] text-apple-text shadow-sm">上一页</button>
+                        <div class="flex space-x-1">
+                            ${activeBlocks.map((_, i) => `<button onclick="event.stopPropagation(); jumpStudioPage(${i})" class="w-2 h-2 rounded-full ${i === curIdx ? 'bg-apple-accent w-4' : 'bg-black/20'} transition-all"></button>`).join('')}
+                        </div>
+                        <button onclick="event.stopPropagation(); stepStudioPage(1)" class="px-2.5 py-1 rounded-full bg-white/80 text-[10px] text-apple-text shadow-sm">下一页</button>
+                    </div>
+                </div>`;
+            }
+
+            return `
+            <div id="${cardId}" ${customStyleAttr} class="${themeObj.bg} ${themeObj.text} rounded-[22px] p-4 border ${themeObj.border} relative shadow-[0_14px_34px_rgba(28,28,30,0.10)] space-y-4">
+                <div class="border-b border-current/10 pb-2.5">
+                    <div class="flex items-center justify-between text-[8px] tracking-[0.24em] opacity-45 mb-1">
+                        <span>${themeObj.badge}</span>
+                        <span>${dateStr}</span>
+                    </div>
+                    <h2 ${editable ? 'contenteditable="true" onclick="event.stopPropagation()" oninput="studioState.customTitle=this.innerText"' : ''}
+                        class="font-serif text-[15px] font-semibold leading-snug focus:outline-none">${title}</h2>
+                </div>
+                <div class="space-y-4">
+                    ${blocks.map((blk, bIdx) => renderSingleStoryBlock(blk, bIdx, editable, themeKey)).join('')}
+                </div>
+            </div>`;
+        }
+
+        // ==================== 2.5 就地图片平移缩放与文字形态切换 ====================
+        function startBlockPhotoDrag(ev, bIdx, pIdx) {
+            ev.stopPropagation();
+            const blk = studioState.storyBlocks[bIdx];
+            if (!blk || !blk.photos[pIdx]) return;
+            const photo = blk.photos[pIdx];
+            const touch = ev.touches ? ev.touches[0] : ev;
+
+            dragState.mode = 'block-photo-pan';
+            dragState.active = true;
+            dragState.blockIdx = bIdx;
+            dragState.photoIdx = pIdx;
+            dragState.startX = touch.clientX;
+            dragState.startY = touch.clientY;
+            dragState.initialPosX = photo.posX ?? 50;
+            dragState.initialPosY = photo.posY ?? 50;
+
+            studioState.activeTextBlockIdx = null;
+            if (studioState.activeBlockIdx !== bIdx || studioState.activePhotoSubIdx !== pIdx) {
+                studioState.activeBlockIdx = bIdx;
+                studioState.activePhotoSubIdx = pIdx;
+                renderStudioCanvas();
+            }
+        }
+
+        function activateTextHUD(bIdx) {
+            studioState.activeBlockIdx = null;
+            studioState.activePhotoSubIdx = null;
+            if (studioState.activeTextBlockIdx !== bIdx) {
+                studioState.activeTextBlockIdx = bIdx;
+                renderStudioCanvas();
+            }
+        }
+
+        function setBlockTextStyle(bIdx, styleKey) {
+            const blk = studioState.storyBlocks[bIdx];
+            if (!blk) return;
+            blk.textStyle = styleKey;
+            renderStudioCanvas();
+        }
+
+        function clearActiveStudioSelection() {
+            if (studioState.activeBlockIdx !== null || studioState.activeTextBlockIdx !== null) {
+                studioState.activeBlockIdx = null;
+                studioState.activePhotoSubIdx = null;
+                studioState.activeTextBlockIdx = null;
+                renderStudioCanvas();
+            }
+        }
+
+        window.addEventListener('mousemove', onGlobalDragMove, { passive: false });
+        window.addEventListener('touchmove', onGlobalDragMove, { passive: false });
+        window.addEventListener('mouseup', onGlobalDragEnd);
+        window.addEventListener('touchend', onGlobalDragEnd);
+
+        function onGlobalDragMove(ev) {
+            if (!dragState.active) return;
+            const touch = ev.touches ? ev.touches[0] : ev;
+
+            if (dragState.mode === 'block-photo-pan') {
+                const dx = touch.clientX - dragState.startX;
+                const dy = touch.clientY - dragState.startY;
+                if (Math.abs(dx) > 3 || Math.abs(dy) > 3) {
+                    if (ev.cancelable) ev.preventDefault();
+                }
+                const photo = studioState.storyBlocks[dragState.blockIdx]?.photos[dragState.photoIdx];
+                if (!photo) return;
+                photo.posX = Math.max(0, Math.min(100, Math.round(dragState.initialPosX - dx * 0.45)));
+                photo.posY = Math.max(0, Math.min(100, Math.round(dragState.initialPosY - dy * 0.45)));
+                const imgEl = document.getElementById(`blk-img-${dragState.blockIdx}-${dragState.photoIdx}`);
+                if (imgEl) {
+                    imgEl.style.objectPosition = `${photo.posX}% ${photo.posY}%`;
+                    imgEl.style.transformOrigin = `${photo.posX}% ${photo.posY}%`;
+                }
+            }
+        }
+
+        function onGlobalDragEnd() {
+            dragState.active = false;
+            dragState.mode = null;
+        }
+
+        function handlePhotoZoom(val) {
+            const bIdx = studioState.activeBlockIdx;
+            const pIdx = studioState.activePhotoSubIdx;
+            const photo = bIdx !== null ? studioState.storyBlocks[bIdx]?.photos?.[pIdx] : null;
+            if (!photo) return;
+            photo.scale = parseFloat(val);
+            const imgEl = document.getElementById(`blk-img-${bIdx}-${pIdx}`);
+            if (imgEl) imgEl.style.transform = `scale(${val})`;
+        }
+
+        function moveBlockOrder(idx, delta) {
+            if (idx === null || idx === undefined) return;
+            const target = idx + delta;
+            if (target < 0 || target >= studioState.storyBlocks.length) return;
+            const temp = studioState.storyBlocks[idx];
+            studioState.storyBlocks[idx] = studioState.storyBlocks[target];
+            studioState.storyBlocks[target] = temp;
+            if (studioState.activeBlockIdx === idx) studioState.activeBlockIdx = target;
+            if (studioState.activeTextBlockIdx === idx) studioState.activeTextBlockIdx = target;
+            renderStudioCanvas();
+        }
+
+        function removeTextFromBlock(bIdx) {
+            const blk = studioState.storyBlocks[bIdx];
+            if (!blk) return;
+            blk.showText = false;
+            studioState.activeTextBlockIdx = null;
+            document.getElementById('btn-restore-blocks').classList.remove('hidden');
+            renderStudioCanvas();
+        }
+
+        function removeActiveBlockItem() {
+            const bIdx = studioState.activeBlockIdx;
+            const pIdx = studioState.activePhotoSubIdx;
+            if (bIdx === null) return;
+            const blk = studioState.storyBlocks[bIdx];
+            if (blk && blk.photos && blk.photos[pIdx]) {
+                blk.photos.splice(pIdx, 1);
+                document.getElementById('btn-restore-blocks').classList.remove('hidden');
+            }
+            studioState.activeBlockIdx = null;
+            studioState.activePhotoSubIdx = null;
+            renderStudioCanvas();
+        }
+
+        function restoreAllDeletedBlocks() {
+            syncStudioPhotosFromFragments();
+            document.getElementById('btn-restore-blocks').classList.add('hidden');
+            renderStudioCanvas();
+            showToast("已恢复全部碎片图文");
+        }
+
+        // ==================== 3. 时光流与图库渲染 ====================
+        function renderTimeline() {
+            const container = document.getElementById('timeline-list');
+            const filtered = fragments.filter(f => {
+                if (onlyUncurated && f.albumId) return false;
+                if (filterDateMode === 'month' && (f.year !== pickerYear || f.monthKey !== pickerMonth)) return false;
+                if (filterDateMode === 'day' && (f.year !== pickerYear || f.monthKey !== pickerMonth || f.dayNum !== filterDayNum)) return false;
+                if (!currentSearchQuery) return true;
+                const q = currentSearchQuery.toLowerCase();
+                return f.text.toLowerCase().includes(q) || f.location.toLowerCase().includes(q);
+            });
+
+            filtered.sort((a, b) => {
+                if (a.year !== b.year) return b.year - a.year;
+                if (a.monthKey !== b.monthKey) return b.monthKey - a.monthKey;
+                if (a.dayNum !== b.dayNum) return b.dayNum - a.dayNum;
+                return (b.sortMinutes || 0) - (a.sortMinutes || 0);
+            });
+
+            if (filtered.length === 0) {
+                container.innerHTML = `
+                <div class="bg-white rounded-3xl p-8 text-center space-y-2">
+                    <p class="text-xs text-apple-sub">当前筛选范围内暂无碎片</p>
+                    ${filterDateMode !== 'all' ? `<button onclick="resetDateFilterToAll()" class="text-xs text-apple-accent font-medium">查看全部时间</button>` : ''}
+                </div>`;
+                return;
+            }
+
+            const groups = {};
+            filtered.forEach(f => {
+                if (!groups[f.dateGroup]) groups[f.dateGroup] = [];
+                groups[f.dateGroup].push(f);
+            });
+
+            let html = '';
+            Object.keys(groups).forEach(dateLabel => {
+                const groupItems = groups[dateLabel];
+                const first = groupItems[0];
+                const allDaySelected = groupItems.every(it => selectedIds.has(it.id));
+                const cleanDayTitle = dateLabel.replace(/^20\d{2}年\s*/, '');
+                const yearBadge = first.year !== 2026
+                    ? `<span class="text-[10px] font-sans font-medium bg-apple-tag text-apple-sub px-1.5 py-0.5 rounded-md ml-1.5">${first.year}</span>`
+                    : '';
+
+                html += `
+                <section data-year="${first.year}" data-month="${first.monthKey}" class="timeline-date-sec space-y-2.5">
+                    <div class="flex items-center justify-between px-1">
+                        <h2 class="font-serif font-semibold text-sm text-apple-text flex items-center">${cleanDayTitle}${yearBadge}</h2>
+                        <button onclick="toggleSelectDayGroup('${dateLabel}')" class="text-[11px] font-medium px-2.5 py-0.5 rounded-full transition-all ${allDaySelected ? 'bg-apple-accent text-white' : 'bg-apple-tag text-apple-sub'}">
+                            ${allDaySelected ? '✓ 当日已选' : '选当日'}
+                        </button>
+                    </div>
+                    <div class="space-y-3">
+                `;
+
+                groupItems.forEach(item => {
+                    const isSelected = selectedIds.has(item.id);
+                    const linkedAlbum = item.albumId ? albumBooks.find(a => a.id === item.albumId) : null;
+                    const cardStyle = isSelected
+                        ? 'ring-2 ring-apple-accent bg-[#FFFCF9]'
+                        : 'bg-white border border-black/[0.04]';
+
+                    const timeDisplay = item.fuzzyPeriod || item.time || '';
+                    const headerMeta = [timeDisplay, item.location].filter(Boolean).join(' · ');
+
+                    let mediaHtml = '';
+                    if (item.images && item.images.length > 1) {
+                        mediaHtml = `
+                            <div class="grid ${item.images.length >= 3 ? 'grid-cols-3' : 'grid-cols-2'} gap-2 my-2.5 relative">
+                                ${item.images.map((img, i) => `
+                                    <div onclick="event.stopPropagation(); openMediaLightbox('${item.id}', ${i})" class="relative overflow-hidden rounded-2xl aspect-[4/3]">
+                                        <img src="${img}" class="w-full h-full object-cover">
+                                    </div>
+                                `).join('')}
+                            </div>`;
+                    } else if (item.images && item.images.length === 1) {
+                        mediaHtml = `
+                            <div onclick="event.stopPropagation(); openMediaLightbox('${item.id}', 0)" class="relative overflow-hidden rounded-2xl my-2.5">
+                                <img src="${item.images[0]}" class="w-full h-40 object-cover">
+                                ${item.hasLiveVideo ? `<span class="absolute top-2.5 left-2.5 bg-black/55 ios-blur text-amber-300 text-[9px] font-semibold px-2 py-0.5 rounded-full">LIVE</span>` : ''}
+                            </div>`;
+                    }
+
+                    html += `
+                        <div onclick="openFragmentDetail('${item.id}')" class="rounded-[26px] p-4 shadow-sm ${cardStyle} transition-all cursor-pointer relative">
+                            <div class="flex items-center justify-between gap-2">
+                                <span class="text-xs font-medium text-apple-sub truncate">${headerMeta}</span>
+                                ${linkedAlbum ? `
+                                    <button onclick="event.stopPropagation(); openAlbumReader('${linkedAlbum.id}')" class="shrink-0 flex items-center space-x-1 bg-apple-accentLight text-apple-accent px-2.5 py-0.5 rounded-full text-[11px] font-medium">
+                                        <i data-lucide="bookmark" class="w-3 h-3"></i>
+                                        <span>《${linkedAlbum.title}》</span>
+                                    </button>
+                                ` : ''}
+                            </div>
+
+                            ${mediaHtml}
+
+                            <div class="flex items-end justify-between gap-3 ${mediaHtml ? '' : 'mt-2'}">
+                                <p class="font-serif text-[14px] text-apple-text leading-relaxed flex-1">${item.text}</p>
+                                <button onclick="event.stopPropagation(); toggleSelectFragment('${item.id}')"
+                                        class="w-8 h-8 rounded-full shrink-0 flex items-center justify-center transition-all ${isSelected ? 'bg-apple-accent text-white shadow-sm' : 'bg-[#F0EFEA] text-apple-text hover:bg-apple-tag'}">
+                                    <i data-lucide="${isSelected ? 'check' : 'plus'}" class="w-4 h-4"></i>
+                                </button>
+                            </div>
+                        </div>`;
+                });
+
+                html += `</div></section>`;
+            });
+
+            container.innerHTML = html;
+            renderVisualGalleryGrid();
+            lucide.createIcons();
+            updateSelectionUI();
+        }
+
+        function filterGalleryMedia(mode) {
+            galleryFilterMode = mode;
+            document.getElementById('gal-filter-all').className = mode === 'all'
+                ? "px-2.5 py-0.5 rounded-full bg-apple-text text-white font-medium"
+                : "px-2.5 py-0.5 rounded-full bg-apple-tag text-apple-sub";
+            document.getElementById('gal-filter-live').className = mode === 'live'
+                ? "px-2.5 py-0.5 rounded-full bg-apple-text text-white font-medium"
+                : "px-2.5 py-0.5 rounded-full bg-apple-tag text-apple-sub";
+            renderVisualGalleryGrid();
+        }
+
+        function renderVisualGalleryGrid() {
+            const grid = document.getElementById('visual-gallery-grid');
+            if (!grid) return;
+            const flatMedia = [];
+
+            fragments.forEach(f => {
+                if (galleryFilterMode === 'live' && !f.hasLiveVideo) return;
+                (f.images || []).forEach((imgUrl, idx) => {
+                    flatMedia.push({ frag: f, imgUrl, idx });
+                });
+            });
+
+            const countLabel = document.getElementById('gallery-count-label');
+            if (countLabel) countLabel.innerText = `${flatMedia.length} 张影像`;
+
+            if (flatMedia.length === 0) {
+                grid.innerHTML = `<div class="col-span-4 bg-white rounded-2xl p-8 text-center text-xs text-apple-sub">暂无匹配的影像</div>`;
+                return;
+            }
+
+            let lastYm = '';
+            grid.innerHTML = flatMedia.map(m => {
+                const isSel = selectedIds.has(m.frag.id);
+                const ym = `${m.frag.year}-${m.frag.monthKey}`;
+                const isNewMonth = ym !== lastYm;
+                lastYm = ym;
+                const subtleDateTag = isNewMonth
+                    ? `<span class="absolute bottom-1 left-1 text-[8px] bg-black/45 ios-blur text-white/90 px-1.5 py-0.5 rounded pointer-events-none">${m.frag.year !== 2026 ? String(m.frag.year).slice(2) + '/' : ''}${m.frag.monthKey}月</span>`
+                    : '';
+
+                return `
+                <div onclick="openMediaLightbox('${m.frag.id}', ${m.idx})" class="cursor-pointer aspect-square relative group bg-white overflow-hidden">
+                    <img src="${m.imgUrl}" class="w-full h-full object-cover group-hover:scale-105 transition-transform">
+                    ${subtleDateTag}
+                    ${m.frag.hasLiveVideo ? `<span class="absolute top-1 left-1 text-[7px] bg-black/60 text-amber-300 px-1 rounded">LIVE</span>` : ''}
+                    <button onclick="event.stopPropagation(); toggleSelectFragment('${m.frag.id}')" class="absolute top-1 right-1 w-5 h-5 rounded-full ${isSel ? 'bg-apple-accent text-white' : 'bg-black/30 text-white/85'} text-[9px] font-bold flex items-center justify-center">
+                        ${isSel ? '✓' : '+'}
+                    </button>
+                </div>`;
+            }).join('');
+        }
+
+        // ==================== 4. 顶部 iOS 双滚轮与月历抽屉 ====================
+        function toggleWheelPickerMode() {
+            const drum = document.getElementById('ios-wheel-drum');
+            drum.classList.toggle('hidden');
+            if (!drum.classList.contains('hidden')) {
+                renderIOSWheelColumns();
+            }
+        }
+
+        function renderIOSWheelColumns() {
+            const years = [2023, 2024, 2025, 2026, 2027];
+            const yCol = document.getElementById('wheel-year-col');
+            const mCol = document.getElementById('wheel-month-col');
+
+            yCol.innerHTML = years.map(y => `
+                <button onclick="setPickerYear(${y})" class="block w-full snap-center py-1 text-xs transition-all ${y === pickerYear ? 'font-bold text-apple-text scale-110' : 'text-apple-sub/60'}">
+                    ${y}年
+                </button>
+            `).join('');
+
+            let mHtml = '';
+            for (let m = 1; m <= 12; m++) {
+                mHtml += `
+                <button onclick="selectPickerMonth(${m})" class="block w-full snap-center py-1 text-xs transition-all ${m === pickerMonth ? 'font-bold text-apple-text scale-110' : 'text-apple-sub/60'}">
+                    ${m}月
+                </button>`;
+            }
+            mCol.innerHTML = mHtml;
+        }
+
+        function renderPopoverCalendar() {
+            document.getElementById('popover-ym-label').innerText = `${pickerYear}年 ${pickerMonth}月`;
+            if (!document.getElementById('ios-wheel-drum').classList.contains('hidden')) {
+                renderIOSWheelColumns();
+            }
+
+            const monthFrags = fragments.filter(f => f.year === pickerYear && f.monthKey === pickerMonth);
+            const dayMap = {};
+            monthFrags.forEach(f => { dayMap[f.dayNum] = f; });
+
+            const grid = document.getElementById('popover-calendar-grid');
+            let cells = '';
+            for (let d = 1; d <= 30; d++) {
+                const frag = dayMap[d];
+                const isSelectedDay = (filterDateMode === 'day' && filterDayNum === d);
+                if (frag) {
+                    const thumb = (frag.images && frag.images[0]) || null;
+                    cells += `
+                        <button onclick="selectCalendarDay(${d})" class="aspect-square rounded-xl overflow-hidden relative flex items-center justify-center ${isSelectedDay ? 'ring-2 ring-apple-text' : 'ring-1 ring-apple-accent'}">
+                            ${thumb ? `<img src="${thumb}" class="w-full h-full object-cover">` : `<div class="w-full h-full bg-apple-accentLight"></div>`}
+                            <span class="absolute inset-0 ${thumb ? 'bg-black/30 text-white' : 'text-apple-accent'} flex items-center justify-center text-[11px] font-bold">${d}</span>
+                        </button>`;
+                } else {
+                    cells += `
+                        <button onclick="selectCalendarDay(${d})" class="aspect-square rounded-xl ${isSelectedDay ? 'bg-apple-text text-white' : 'bg-apple-bg/60 text-apple-sub'} flex items-center justify-center text-[11px]">
+                            ${d}
+                        </button>`;
+                }
+            }
+            grid.innerHTML = cells;
+            lucide.createIcons();
+        }
+
+        function setPickerYear(y) {
+            const num = parseInt(y);
+            if (!num) return;
+            pickerYear = num;
+            filterDateMode = 'month';
+            updateHeaderDateLabel();
+            renderPopoverCalendar();
+            renderTimeline();
+        }
+
+        function selectPickerMonth(m) {
+            pickerMonth = m;
+            filterDateMode = 'month';
+            updateHeaderDateLabel();
+            renderPopoverCalendar();
+            renderTimeline();
+        }
+
+        function selectCalendarDay(d) {
+            filterDayNum = d;
+            filterDateMode = 'day';
+            updateHeaderDateLabel();
+            document.getElementById('quick-date-popover').classList.add('hidden');
+            switchTimeScale('day');
+            renderTimeline();
+        }
+
+        function resetDateFilterToAll() {
+            filterDateMode = 'all';
+            filterDayNum = null;
+            pickerYear = 2026;
+            pickerMonth = 11;
+            updateHeaderDateLabel();
+            document.getElementById('quick-date-popover').classList.add('hidden');
+            renderTimeline();
+        }
+
+        function updateHeaderDateLabel(scrollYear, scrollMonth) {
+            const titleEl = document.getElementById('header-date-title');
+            const yearSubEl = document.getElementById('header-year-sub');
+            const pillEl = document.getElementById('header-filter-pill');
+            const calBtn = document.getElementById('btn-cal-trigger');
+
+            if (filterDateMode === 'day') {
+                titleEl.innerText = `${pickerMonth}月${filterDayNum}日`;
+                yearSubEl.innerText = pickerYear;
+                pillEl.classList.remove('hidden');
+                calBtn.className = "w-7 h-7 rounded-full bg-apple-accent text-white flex items-center justify-center transition-colors";
+            } else if (filterDateMode === 'month') {
+                titleEl.innerText = `${pickerMonth}月`;
+                yearSubEl.innerText = pickerYear;
+                pillEl.classList.remove('hidden');
+                calBtn.className = "w-7 h-7 rounded-full bg-apple-accent text-white flex items-center justify-center transition-colors";
+            } else {
+                const y = scrollYear || 2026;
+                const m = scrollMonth || 11;
+                titleEl.innerText = `${m}月`;
+                yearSubEl.innerText = y;
+                pillEl.classList.add('hidden');
+                calBtn.className = "w-7 h-7 rounded-full bg-apple-tag text-apple-text flex items-center justify-center transition-colors";
+            }
+        }
+
+        // ==================== 5. 碎片详情与模糊时段编辑 ====================
+        function openFragmentDetail(id) {
+            const f = fragments.find(item => item.id === id);
+            if (!f) return;
+            editingFragmentId = id;
+            editingFuzzyPeriod = f.fuzzyPeriod || '';
+
+            const mm = String(f.monthKey).padStart(2, '0');
+            const dd = String(f.dayNum).padStart(2, '0');
+            document.getElementById('detail-frag-date-input').value = `${f.year}-${mm}-${dd}`;
+            document.getElementById('detail-frag-exact-time').value = /^\d{2}:\d{2}$/.test(f.time) ? f.time : '';
+            document.getElementById('detail-frag-loc').value = f.location || '';
+            document.getElementById('detail-frag-text').value = f.text || '';
+
+            renderFuzzyPeriodPills();
+            renderDetailFragImages(f);
+
+            const modal = document.getElementById('fragment-detail-modal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+            lucide.createIcons();
+        }
+
+        function renderFuzzyPeriodPills() {
+            const periods = [
+                { k: '清晨', label: '清晨' },
+                { k: '上午', label: '上午' },
+                { k: '午后', label: '午后' },
+                { k: '傍晚', label: '傍晚' },
+                { k: '深夜', label: '深夜' },
+                { k: '', label: '不标时刻' }
+            ];
+            const wrap = document.getElementById('fuzzy-period-pills');
+            wrap.innerHTML = periods.map(p => `
+                <button onclick="selectFuzzyPeriod('${p.k}')" class="px-2.5 py-1 rounded-full text-[11px] transition-all ${editingFuzzyPeriod === p.k ? 'bg-apple-text text-white font-semibold' : 'bg-apple-bg text-apple-sub'}">
+                    ${p.label}
+                </button>
+            `).join('');
+        }
+
+        function selectFuzzyPeriod(p) {
+            editingFuzzyPeriod = p;
+            document.getElementById('detail-frag-exact-time').value = '';
+            renderFuzzyPeriodPills();
+        }
+
+        function renderDetailFragImages(f) {
+            const wrap = document.getElementById('detail-frag-images');
+            const imgs = f.images || [];
+            if (imgs.length === 0) {
+                wrap.innerHTML = `<div class="col-span-3 text-[11px] text-apple-sub py-3 text-center bg-white rounded-xl">暂无图片</div>`;
+                return;
+            }
+            wrap.innerHTML = imgs.map((url, idx) => `
+                <div onclick="openMediaLightbox('${f.id}', ${idx})" class="relative aspect-square rounded-xl overflow-hidden group cursor-zoom-in">
+                    <img src="${url}" class="w-full h-full object-cover">
+                    <button onclick="event.stopPropagation(); removePhotoFromEditingFragment(${idx})" class="absolute top-1 right-1 w-5 h-5 rounded-full bg-black/65 text-white text-[10px] flex items-center justify-center">×</button>
+                </div>
+            `).join('');
+        }
+
+        function addPhotoToEditingFragment() {
+            const f = fragments.find(item => item.id === editingFragmentId);
+            if (!f) return;
+            if (!f.images) f.images = [];
+            const nextImg = samplePhotoPool[(f.images.length + 2) % samplePhotoPool.length];
+            f.images.push(nextImg);
+            renderDetailFragImages(f);
+            showToast("已添加 1 张照片");
+        }
+
+        function removePhotoFromEditingFragment(idx) {
+            const f = fragments.find(item => item.id === editingFragmentId);
+            if (!f || !f.images) return;
+            f.images.splice(idx, 1);
+            renderDetailFragImages(f);
+        }
+
+        function saveFragmentDetail() {
+            const f = fragments.find(item => item.id === editingFragmentId);
+            if (f) {
+                const dateVal = document.getElementById('detail-frag-date-input').value;
+                if (dateVal) {
+                    const parts = dateVal.split('-').map(Number);
+                    f.year = parts[0];
+                    f.monthKey = parts[1];
+                    f.dayNum = parts[2];
+                    if (f.year === 2026 && f.monthKey === 11 && f.dayNum === 4) {
+                        f.dateGroup = '今天 · 11月4日';
+                    } else if (f.year === 2026 && f.monthKey === 11 && f.dayNum === 3) {
+                        f.dateGroup = '昨天 · 11月3日';
+                    } else if (f.year === 2026) {
+                        f.dateGroup = `${f.monthKey}月${f.dayNum}日`;
+                    } else {
+                        f.dateGroup = `${f.year}年 ${f.monthKey}月${f.dayNum}日`;
+                    }
+                }
+                const exactTime = document.getElementById('detail-frag-exact-time').value;
+                if (exactTime) {
+                    f.time = exactTime;
+                    f.fuzzyPeriod = '';
+                    const [hh, mm] = exactTime.split(':').map(Number);
+                    f.sortMinutes = hh * 60 + mm;
+                } else {
+                    f.fuzzyPeriod = editingFuzzyPeriod;
+                    f.time = editingFuzzyPeriod || '';
+                    f.sortMinutes = periodSortMap[editingFuzzyPeriod] ?? 720;
+                }
+                f.location = document.getElementById('detail-frag-loc').value.trim();
+                f.text = document.getElementById('detail-frag-text').value.trim();
+            }
+            closeFragmentDetail();
+            renderTimeline();
+            showToast("已更新碎片");
+        }
+
+        function renderBookshelf() {
+            const shelf = document.getElementById('bookshelf-grid');
+            shelf.innerHTML = albumBooks.map(book => `
+                <div onclick="openAlbumReader('${book.id}')" class="cursor-pointer group">
+                    <div class="relative h-48 rounded-r-2xl rounded-l-md overflow-hidden book-spine bg-white border border-black/10">
+                        <img src="${book.cover}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500">
+                        <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent"></div>
+                        <div class="absolute inset-y-0 left-0 w-3" style="background-color:${book.spineColor}"></div>
+                        <div class="absolute top-2.5 right-2.5 bg-black/50 ios-blur text-white text-[10px] px-2 py-0.5 rounded-full">
+                            ${book.pages.length} 页画报
+                        </div>
+                        <div class="absolute bottom-3 left-4 right-3 text-white">
+                            <h3 class="font-serif font-bold text-sm leading-snug">《${book.title}》</h3>
+                            <p class="text-[10px] text-white/75 truncate mt-0.5">${book.subtitle}</p>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function switchClusterCategory(cat) {
+            ['people', 'place', 'mood'].forEach(c => {
+                const btn = document.getElementById(`cluster-tab-${c}`);
+                btn.className = (c === cat)
+                    ? "px-2 py-0.5 rounded-full bg-apple-text text-white"
+                    : "px-2 py-0.5 rounded-full bg-apple-tag text-apple-sub";
+            });
+            const list = smartClustersData[cat] || [];
+            document.getElementById('smart-clusters-list').innerHTML = list.map(item => `
+                <div class="bg-white rounded-2xl p-3 border border-black/[0.04] flex items-center justify-between">
+                    <div class="space-y-0.5 pr-2">
+                        <h4 class="font-serif font-semibold text-xs text-apple-text">${item.title}</h4>
+                        <p class="text-[10px] text-apple-sub">${item.desc}</p>
+                    </div>
+                    <button onclick="curateCluster('${item.ids.join(',')}')" class="shrink-0 bg-apple-accentLight text-apple-accent text-[11px] font-semibold px-3 py-1.5 rounded-xl">
+                        合成一页
+                    </button>
+                </div>
+            `).join('');
+        }
+
+        function curateCluster(idsCsv) {
+            selectedIds = new Set(idsCsv.split(',').filter(Boolean));
+            openStudioFromSelection();
+        }
+
+        function toggleSelectFragment(id) {
+            if (selectedIds.has(id)) selectedIds.delete(id);
+            else selectedIds.add(id);
+            renderTimeline();
+        }
+
+        function toggleSelectDayGroup(dateLabel) {
+            const dayItems = fragments.filter(f => f.dateGroup === dateLabel);
+            const allSelected = dayItems.every(it => selectedIds.has(it.id));
+            dayItems.forEach(it => {
+                if (allSelected) selectedIds.delete(it.id);
+                else selectedIds.add(it.id);
+            });
+            renderTimeline();
+        }
+
+        function clearSelection() {
+            selectedIds.clear();
+            renderTimeline();
+        }
+
+        function updateSelectionUI() {
+            const count = selectedIds.size;
+            const batchBar = document.getElementById('batch-curate-bar');
+            const quickInput = document.getElementById('quick-input-bar');
+            const badge = document.getElementById('selected-count-badge');
+            if (count > 0) {
+                badge.innerText = count;
+                batchBar.classList.remove('hidden');
+                if (quickInput) quickInput.classList.add('hidden');
+            } else {
+                batchBar.classList.add('hidden');
+                if (quickInput && currentMainTab === 'fragments') quickInput.classList.remove('hidden');
+            }
+        }
+
+        function closeFragmentDetail() {
+            const modal = document.getElementById('fragment-detail-modal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+            editingFragmentId = null;
+        }
+
+        function deleteCurrentFragment() {
+            if (!editingFragmentId) return;
+            fragments = fragments.filter(f => f.id !== editingFragmentId);
+            selectedIds.delete(editingFragmentId);
+            closeFragmentDetail();
+            renderTimeline();
+            showToast("已删除该条碎片");
+        }
+
+        function curateSingleFragmentFromDetail() {
+            if (!editingFragmentId) return;
+            const id = editingFragmentId;
+            closeFragmentDetail();
+            selectedIds = new Set([id]);
+            openStudioFromSelection();
+        }
+
+        function filterMapRange(range) {
+            currentMapRange = range;
+            ['all', 'month', 'week'].forEach(r => {
+                const btn = document.getElementById(`map-range-${r}`);
+                if (btn) {
+                    btn.className = (r === range)
+                        ? "flex-1 py-1 rounded-lg bg-white text-apple-text font-medium shadow-sm"
+                        : "flex-1 py-1 rounded-lg text-apple-sub";
+                }
+            });
+            renderMapPins();
+        }
+
+        function renderMapPins() {
+            const layer = document.getElementById('map-pins-layer');
+            if (!layer) return;
+            const visible = fragments.filter(f => {
+                if (currentMapRange === 'week') return f.range === 'week';
+                if (currentMapRange === 'month') return f.range === 'week' || f.range === 'month';
+                return true;
+            });
+            const label = document.getElementById('map-stat-label');
+            if (label) label.innerText = `当前视野 ${visible.length} 处记忆散点`;
+
+            layer.innerHTML = visible.map(f => {
+                const thumb = (f.images && f.images[0]) || samplePhotoPool[0];
+                return `
+                <div onclick="openFragmentDetail('${f.id}')" style="left:${f.mapX || 50}%; top:${f.mapY || 50}%;" class="-translate-x-1/2 -translate-y-1/2 absolute cursor-pointer group">
+                    <div class="bg-white p-1 rounded-xl shadow-md border border-black/10 flex items-center space-x-1.5 pr-2 hover:scale-105 transition-transform">
+                        <img src="${thumb}" class="w-7 h-7 rounded-lg object-cover">
+                        <span class="text-[10px] font-medium text-apple-text max-w-[78px] truncate">${f.location}</span>
+                    </div>
+                </div>`;
+            }).join('');
+        }
+
+        function curateVisibleMapPins() {
+            const visible = fragments.filter(f => {
+                if (currentMapRange === 'week') return f.range === 'week';
+                if (currentMapRange === 'month') return f.range === 'week' || f.range === 'month';
+                return true;
+            });
+            selectedIds = new Set(visible.map(f => f.id));
+            openStudioFromSelection();
+        }
+
+        function openAlbumReader(albumId, pageIdx = 0) {
+            const book = albumBooks.find(a => a.id === albumId);
+            if (!book) return;
+            readingAlbum = book;
+            readingPageIndex = pageIdx;
+            document.getElementById('reader-single-view').classList.remove('hidden');
+            document.getElementById('reader-grid-overview').classList.add('hidden');
+            renderCurrentAlbumPage();
+            const modal = document.getElementById('book-reader-modal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+            lucide.createIcons();
+        }
+
+        function closeBookReader() {
+            const modal = document.getElementById('book-reader-modal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+            readingAlbum = null;
+        }
+
+        function turnAlbumPage(delta) {
+            if (!readingAlbum) return;
+            const next = readingPageIndex + delta;
+            if (next < 0 || next >= readingAlbum.pages.length) {
+                showToast(next < 0 ? "已经是第一页" : "已经是最后一页");
+                return;
+            }
+            readingPageIndex = next;
+            renderCurrentAlbumPage();
+        }
+
+        function jumpToAlbumPage(idx) {
+            if (!readingAlbum) return;
+            readingPageIndex = idx;
+            document.getElementById('reader-single-view').classList.remove('hidden');
+            document.getElementById('reader-grid-overview').classList.add('hidden');
+            renderCurrentAlbumPage();
+        }
+
+        function toggleReaderGridOverview() {
+            if (!readingAlbum) return;
+            const single = document.getElementById('reader-single-view');
+            const gridWrap = document.getElementById('reader-grid-overview');
+            const isGridHidden = gridWrap.classList.contains('hidden');
+            if (isGridHidden) {
+                single.classList.add('hidden');
+                gridWrap.classList.remove('hidden');
+                document.getElementById('reader-pages-grid').innerHTML = readingAlbum.pages.map((p, idx) => {
+                    const f = fragments.find(fr => p.fragmentIds.includes(fr.id));
+                    const thumb = p.storyBlocks?.[0]?.photos?.[0]?.url || f?.images?.[0] || readingAlbum.cover;
+                    return `
+                    <div onclick="jumpToAlbumPage(${idx})" class="cursor-pointer bg-white rounded-2xl p-2 shadow-sm border ${idx === readingPageIndex ? 'border-apple-accent' : 'border-black/5'} space-y-1.5">
+                        <img src="${thumb}" class="w-full h-28 object-cover rounded-xl">
+                        <p class="font-serif text-[11px] font-semibold text-apple-text line-clamp-1">${p.title}</p>
+                        <p class="text-[9px] text-apple-sub">${p.dateStr}</p>
+                    </div>`;
+                }).join('');
+            } else {
+                gridWrap.classList.add('hidden');
+                single.classList.remove('hidden');
+            }
+        }
+
+        function createNewAlbumBookPrompt() {
+            const newBook = {
+                id: 'album_' + Date.now(),
+                title: `拾帧集 Vol.${albumBooks.length + 1}`,
+                subtitle: '自定义主题连载画册',
+                cover: samplePhotoPool[albumBooks.length % samplePhotoPool.length],
+                spineColor: '#5B7065',
+                pages: [
+                    {
+                        id: 'page_init_' + Date.now(),
+                        dateStr: '2026.11.04',
+                        title: '新画册的第一页序章',
+                        bodyText: '将散落的日常装订成册。',
+                        theme: 'kinfolk',
+                        format: 'long',
+                        fragmentIds: ['f1']
+                    }
+                ]
+            };
+            albumBooks.unshift(newBook);
+            renderBookshelf();
+            showToast(`已创建《${newBook.title}》`);
+        }
+
+        function openMediaLightbox(fragId, imgIdx = 0) {
+            const f = fragments.find(item => item.id === fragId);
+            if (!f || !f.images || f.images.length === 0) return;
+            document.getElementById('lightbox-meta-title').innerText = f.location || '日常影像';
+            document.getElementById('lightbox-meta-sub').innerText = `${f.dateGroup} ${f.fuzzyPeriod || f.time || ''}`;
+            document.getElementById('lightbox-main-img').src = f.images[imgIdx] || f.images[0];
+            document.getElementById('lightbox-caption').innerText = f.text || '';
+            document.getElementById('lightbox-live-badge').classList.toggle('hidden', !f.hasLiveVideo);
+
+            const thumbs = document.getElementById('lightbox-thumbs');
+            if (f.images.length > 1) {
+                thumbs.innerHTML = f.images.map((u, idx) => `
+                    <img onclick="document.getElementById('lightbox-main-img').src='${u}'" src="${u}" class="w-10 h-10 rounded-lg object-cover cursor-pointer border ${idx === imgIdx ? 'border-white' : 'border-transparent opacity-60'}">
+                `).join('');
+            } else {
+                thumbs.innerHTML = '';
+            }
+
+            const modal = document.getElementById('media-lightbox-modal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+            lucide.createIcons();
+        }
+
+        function openMediaLightboxFromUrl(url, title) {
+            document.getElementById('lightbox-meta-title').innerText = title || '画报影像';
+            document.getElementById('lightbox-meta-sub').innerText = '2026.11.04';
+            document.getElementById('lightbox-main-img').src = url;
+            document.getElementById('lightbox-caption').innerText = '';
+            document.getElementById('lightbox-thumbs').innerHTML = '';
+            document.getElementById('lightbox-live-badge').classList.add('hidden');
+            const modal = document.getElementById('media-lightbox-modal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        function closeMediaLightbox() {
+            const modal = document.getElementById('media-lightbox-modal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+
+        function addNewPageToCurrentAlbum() {
+            if (!readingAlbum) return;
+            const targetAlbumId = readingAlbum.id;
+            closeBookReader();
+            editingPageRef = null;
+            selectedIds = new Set(['f1', 'f2']);
+            studioState.storyBlocks = [];
+            pendingAlbumTargetId = targetAlbumId;
+            openStudioFromSelection();
+        }
+
+        function getSelectedFragmentsList() {
+            const list = fragments.filter(f => selectedIds.has(f.id));
+            return list.length > 0 ? list : [fragments[1], fragments[2]];
+        }
+
+        function syncStudioPhotosFromFragments() {
+            studioState.storyBlocks = buildStoryBlocksFromFragments(getSelectedFragmentsList(), studioState.layoutSeed);
+            studioState.activeBlockIdx = null;
+            studioState.activePhotoSubIdx = null;
+            studioState.activeTextBlockIdx = null;
+        }
+
+        function renderCurrentAlbumPage() {
+            const page = readingAlbum.pages[readingPageIndex];
+            const pageFrags = fragments.filter(f => page.fragmentIds.includes(f.id));
+            document.getElementById('reader-book-title').innerText = `《${readingAlbum.title}》`;
+            document.getElementById('reader-page-indicator').innerText = `${readingPageIndex + 1} / ${readingAlbum.pages.length} · ${page.dateStr}`;
+
+            document.getElementById('reader-rendered-page').innerHTML = buildRenderedPosterHTML({
+                fragments: pageFrags.length ? pageFrags : [fragments[0]],
+                dateStr: page.dateStr,
+                title: page.title,
+                bodyText: page.bodyText,
+                theme: page.theme || 'kinfolk',
+                format: page.format || 'long',
+                storyBlocks: page.storyBlocks,
+                customBgStyle: page.customBgStyle,
+                editable: false
+            });
+
+            const strip = document.getElementById('reader-thumbnails-strip');
+            strip.innerHTML = readingAlbum.pages.map((p, idx) => {
+                const f = fragments.find(fr => p.fragmentIds.includes(fr.id));
+                const firstBlkImg = p.storyBlocks?.[0]?.photos?.[0]?.url;
+                const thumb = firstBlkImg || f?.images?.[0] || readingAlbum.cover;
+                const activeCls = idx === readingPageIndex ? 'ring-2 ring-apple-accent scale-105 opacity-100' : 'opacity-50';
+                return `
+                    <button onclick="jumpToAlbumPage(${idx})" class="shrink-0 w-8 h-10 rounded-lg overflow-hidden relative transition-all shadow-sm ${activeCls}">
+                        <img src="${thumb}" class="w-full h-full object-cover">
+                    </button>`;
+            }).join('');
+
+            document.getElementById('reader-edit-btn').onclick = () => {
+                const targetAlbumId = readingAlbum ? readingAlbum.id : albumBooks[0].id;
+                closeBookReader();
+                editingPageRef = { albumId: targetAlbumId, pageId: page.id };
+                selectedIds = new Set(page.fragmentIds);
+                studioState.customTitle = page.title;
+                studioState.theme = page.theme || 'kinfolk';
+                studioState.format = page.format || 'long';
+                studioState.storyBlocks = page.storyBlocks ? JSON.parse(JSON.stringify(page.storyBlocks)) : buildStoryBlocksFromFragments(pageFrags, 0);
+                openStudioFromSelection();
+            };
+        }
+
+        // ==================== 6. 画报工作台操控 ====================
+        let aiLoadingTimers = [];
+        function runAILoadingSequence(onDone, steps) {
+            const overlay = document.getElementById('studio-ai-loading');
+            const stepEl = document.getElementById('ai-loading-step');
+            const barEl = document.getElementById('ai-loading-bar');
+            const seq = steps || [
+                ['正在读取碎片图文与光影…', 25],
+                ['正在编排图文穿插手账布局…', 78]
+            ];
+            aiLoadingTimers.forEach(t => clearTimeout(t));
+            aiLoadingTimers = [];
+            barEl.style.width = '12%';
+            stepEl.innerText = seq[0][0];
+            overlay.classList.remove('hidden');
+            overlay.classList.add('flex');
+            seq.forEach((s, i) => {
+                aiLoadingTimers.push(setTimeout(() => {
+                    stepEl.innerText = s[0];
+                    barEl.style.width = s[1] + '%';
+                }, i * 380));
+            });
+            aiLoadingTimers.push(setTimeout(() => {
+                overlay.classList.add('hidden');
+                overlay.classList.remove('flex');
+                if (onDone) onDone();
+            }, seq.length * 380 + 180));
+        }
+
+        function openStudioFromSelection() {
+            if (selectedIds.size === 0) {
+                selectedIds.add('f1');
+                selectedIds.add('f2');
+            }
+            if (!editingPageRef || !studioState.storyBlocks || studioState.storyBlocks.length === 0) {
+                syncStudioPhotosFromFragments();
+            }
+            studioState.activeBlockIdx = null;
+            studioState.activePhotoSubIdx = null;
+            studioState.activeTextBlockIdx = null;
+            document.getElementById('btn-restore-blocks').classList.add('hidden');
+            syncFormatButtons();
+            document.getElementById('studio-modal').classList.remove('hidden');
+            document.getElementById('studio-modal').classList.add('flex');
+            lucide.createIcons();
+            runAILoadingSequence(() => {
+                renderStudioCanvas();
+                lucide.createIcons();
+            });
+        }
+
+        function closeStudioModal() {
+            aiLoadingTimers.forEach(t => clearTimeout(t));
+            aiLoadingTimers = [];
+            const overlay = document.getElementById('studio-ai-loading');
+            overlay.classList.add('hidden');
+            overlay.classList.remove('flex');
+            document.getElementById('studio-modal').classList.add('hidden');
+            document.getElementById('studio-modal').classList.remove('flex');
+            editingPageRef = null;
+            studioState.storyBlocks = [];
+            studioState.activeBlockIdx = null;
+            renderTimeline();
+        }
+
+        function renderInlineSelectedFragmentsStrip() {
+            const strip = document.getElementById('inline-selected-frags');
+            if (!strip) return;
+            const list = getSelectedFragmentsList();
+            strip.innerHTML = list.map(f => {
+                const thumb = (f.images && f.images[0]) || null;
+                return `
+                <button onclick="toggleFragmentInsideStudio('${f.id}')" title="移出"
+                        class="relative shrink-0 w-7 h-7 rounded-lg overflow-hidden border border-black/10 bg-apple-tag active:scale-95 transition-transform">
+                    ${thumb ? `<img src="${thumb}" class="w-full h-full object-cover">`
+                            : `<span class="w-full h-full flex items-center justify-center text-[9px] text-apple-sub">文</span>`}
+                    <span class="absolute top-0 right-0 w-2.5 h-2.5 bg-black/50 text-white text-[7px] flex items-center justify-center rounded-bl">×</span>
+                </button>`;
+            }).join('');
+        }
+
+        function renderStudioCanvas() {
+            const list = getSelectedFragmentsList();
+            const loc = list[0]?.location || '街角';
+            const title = studioState.customTitle || `在${loc}，被日常接住的一瞬`;
+
+            renderInlineSelectedFragmentsStrip();
+            updateThemeLabel();
+
+            document.getElementById('poster-canvas').innerHTML = buildRenderedPosterHTML({
+                fragments: list,
+                dateStr: '2026.11.04',
+                title: title,
+                theme: studioState.theme,
+                format: studioState.format,
+                customBgStyle: studioState.customBgStyle,
+                storyBlocks: studioState.storyBlocks,
+                editable: true
+            });
+        }
+
+        function syncFormatButtons() {
+            ['long', 'pages'].forEach(m => {
+                const btn = document.getElementById('fmt-' + m);
+                if (!btn) return;
+                btn.className = m === studioState.format
+                    ? "px-3.5 py-1 rounded-full bg-white text-apple-text shadow-sm transition-all"
+                    : "px-3.5 py-1 rounded-full transition-all";
+            });
+        }
+
+        function switchStudioFormat(fmt) {
+            studioState.format = fmt;
+            studioState.currentPageIdx = 0;
+            syncFormatButtons();
+            clearActiveStudioSelection();
+            renderStudioCanvas();
+        }
+
+        function stepStudioPage(delta) {
+            const activeBlocks = (studioState.storyBlocks || []).filter(b => (b.photos && b.photos.length > 0) || (b.showText && b.text));
+            const next = (studioState.currentPageIdx || 0) + delta;
+            if (next < 0 || next >= activeBlocks.length) return;
+            studioState.currentPageIdx = next;
+            renderStudioCanvas();
+        }
+
+        function jumpStudioPage(idx) {
+            studioState.currentPageIdx = idx;
+            renderStudioCanvas();
+        }
+
+        function openPhotoReplaceSheetForActive() {
+            if (studioState.activeBlockIdx === null) return;
+            document.getElementById('photo-replace-sheet').classList.remove('hidden');
+            switchReplaceSourceTab('app');
+        }
+
+        function closePhotoReplaceSheet() {
+            document.getElementById('photo-replace-sheet').classList.add('hidden');
+        }
+
+        function switchReplaceSourceTab(tab) {
+            studioState.replaceSourceTab = tab;
+            document.getElementById('rep-tab-app').className = tab === 'app'
+                ? "flex-1 py-1.5 rounded-lg bg-white text-apple-text shadow-sm"
+                : "flex-1 py-1.5 rounded-lg text-apple-sub";
+            document.getElementById('rep-tab-phone').className = tab === 'phone'
+                ? "flex-1 py-1.5 rounded-lg bg-white text-apple-text shadow-sm"
+                : "flex-1 py-1.5 rounded-lg text-apple-sub";
+
+            const grid = document.getElementById('replace-photo-grid');
+            if (tab === 'app') {
+                const appImgs = [];
+                fragments.forEach(f => {
+                    (f.images || []).forEach(u => appImgs.push({ url: u, label: f.location }));
+                });
+                grid.innerHTML = appImgs.map(item => `
+                    <div onclick="confirmReplacePhoto('${item.url}')" class="cursor-pointer aspect-square rounded-xl overflow-hidden relative group">
+                        <img src="${item.url}" class="w-full h-full object-cover">
+                        <span class="absolute bottom-1 left-1 right-1 bg-black/55 text-white text-[9px] px-1.5 py-0.5 rounded truncate">${item.label}</span>
+                    </div>
+                `).join('');
+            } else {
+                grid.innerHTML = samplePhotoPool.map(url => `
+                    <div onclick="confirmReplacePhoto('${url}')" class="cursor-pointer aspect-square rounded-xl overflow-hidden relative">
+                        <img src="${url}" class="w-full h-full object-cover">
+                        <span class="absolute top-1 right-1 bg-apple-accent text-white text-[9px] px-1.5 py-0.5 rounded-full">相册</span>
+                    </div>
+                `).join('');
+            }
+        }
+
+        function confirmReplacePhoto(newUrl) {
+            const bIdx = studioState.activeBlockIdx;
+            const pIdx = studioState.activePhotoSubIdx;
+            if (bIdx !== null && studioState.storyBlocks[bIdx]?.photos?.[pIdx]) {
+                studioState.storyBlocks[bIdx].photos[pIdx] = { url: newUrl, posX: 50, posY: 50, scale: 1 };
+            }
+            closePhotoReplaceSheet();
+            renderStudioCanvas();
+        }
+
+        function selectAIPresetProposal(themeKey) {
+            studioState.theme = themeKey;
+            studioState.customBgStyle = '';
+            studioState.aiNote = '';
+            ['kinfolk', 'scrapbook', 'illustrated'].forEach(k => {
+                const el = document.getElementById('ts-' + k);
+                if (el) {
+                    el.className = `group text-left bg-white p-2 rounded-2xl border-2 ${k === themeKey ? 'border-apple-accent' : 'border-transparent'} shadow-sm space-y-1.5 transition-all`;
+                }
+            });
+
+            (studioState.storyBlocks || []).forEach((blk, idx) => {
+                if (themeKey === 'scrapbook') {
+                    blk.textStyle = 'tape-float';
+                } else if (themeKey === 'illustrated') {
+                    blk.textStyle = idx % 2 === 0 ? 'side-by-side' : 'note-below';
+                } else {
+                    blk.textStyle = idx % 2 === 0 ? 'side-by-side' : 'caption-in';
+                }
+            });
+
+            updateThemeLabel();
+            renderStudioCanvas();
+        }
+
+        function updateThemeLabel() {
+            const tObj = aiCreativeThemes[studioState.theme];
+            const label = document.getElementById('ai-theme-desc');
+            if (!label) return;
+            label.innerText = studioState.aiNote || (tObj ? `AI · ${tObj.name}` : 'AI 排版与风格');
+        }
+
+        function openThemeSheet() {
+            const m = document.getElementById('theme-sheet');
+            m.classList.remove('hidden');
+            m.classList.add('flex');
+            lucide.createIcons();
+        }
+
+        function closeThemeSheet() {
+            const m = document.getElementById('theme-sheet');
+            m.classList.add('hidden');
+            m.classList.remove('flex');
+        }
+
+        function extractPhrase(text) {
+            const t = (text || '').split(/[，。！？,.!?；;、\s]/).filter(Boolean)[0] || '';
+            return t.slice(0, 11);
+        }
+
+        function applyCustomPromptDirection(promptText) {
+            const clean = (promptText || '').trim();
+            if (!clean) {
+                showToast("请输入你想要的排版感觉");
+                return;
+            }
+            closeThemeSheet();
+            runAILoadingSequence(() => {
+                const list = getSelectedFragmentsList();
+                const loc = list[0]?.location || '城市街角';
+                const base = extractPhrase(list[0]?.text) || loc;
+
+                if (clean.includes('暗') || clean.includes('胶片') || clean.includes('夜') || clean.includes('电影')) {
+                    studioState.theme = 'amber_film';
+                    studioState.customBgStyle = 'background: linear-gradient(155deg, #1E1C20 0%, #2D262E 100%); color: #F5EFEB;';
+                    (studioState.storyBlocks || []).forEach(b => b.textStyle = 'caption-in');
+                } else if (clean.includes('图上') || clean.includes('悬浮') || clean.includes('胶带')) {
+                    studioState.theme = 'scrapbook';
+                    studioState.customBgStyle = '';
+                    (studioState.storyBlocks || []).forEach(b => b.textStyle = 'tape-float');
+                } else {
+                    studioState.theme = 'illustrated';
+                    studioState.customBgStyle = 'background: linear-gradient(160deg, #F6F4EC 0%, #E7E3D4 100%); color: #262420;';
+                    (studioState.storyBlocks || []).forEach((b, i) => b.textStyle = i % 2 === 0 ? 'side-by-side' : 'tape-float');
+                }
+
+                studioState.customTitle = `${base} · 拾帧记`;
+                studioState.aiNote = `定制 · ${clean.slice(0, 6)}`;
+                renderStudioCanvas();
+                showToast(`已按「${clean.slice(0, 10)}」重排`);
+            }, [
+                [`正在理解「${clean.slice(0, 10)}」…`, 45],
+                ['正在生成对应图文版式…', 88]
+            ]);
+        }
+
+        function simulateReferenceUpload() {
+            closeThemeSheet();
+            runAILoadingSequence(() => {
+                studioState.customBgStyle = 'background: linear-gradient(160deg, #F6EFE8 0%, #E5D6C5 100%); color: #362B22;';
+                studioState.aiNote = '参考图风格 · 复古杂志';
+                (studioState.storyBlocks || []).forEach((blk, i) => {
+                    blk.textStyle = i % 2 === 0 ? 'side-by-side' : 'tape-float';
+                });
+                renderStudioCanvas();
+                showToast('已提取参考图色彩与排版节奏');
+            }, [
+                ['正在提取参考图色板与留白比例…', 50],
+                ['正在映射当前碎片图文…', 90]
+            ]);
+        }
+
+        function openFragmentManagerSheet() {
+            document.getElementById('fragment-manager-sheet').classList.remove('hidden');
+            renderFragmentManagerList();
+            lucide.createIcons();
+        }
+
+        function closeFragmentManagerSheet() {
+            document.getElementById('fragment-manager-sheet').classList.add('hidden');
+        }
+
+        function renderFragmentManagerList() {
+            const q = (document.getElementById('sheet-frag-search')?.value || '').trim().toLowerCase();
+            const listEl = document.getElementById('sheet-frag-list');
+
+            const filtered = fragments.filter(f => {
+                if (q && !f.text.toLowerCase().includes(q) && !f.location.toLowerCase().includes(q)) return false;
+                return true;
+            });
+
+            filtered.sort((a, b) => (selectedIds.has(b.id) ? 1 : 0) - (selectedIds.has(a.id) ? 1 : 0));
+
+            listEl.innerHTML = filtered.map(f => {
+                const isSel = selectedIds.has(f.id);
+                const thumb = (f.images && f.images[0]) || null;
+                return `
+                <div onclick="toggleFragmentInsideStudio('${f.id}')" class="cursor-pointer bg-white p-2 rounded-xl border ${isSel ? 'border-apple-accent' : 'border-black/[0.04]'} flex items-center gap-2.5">
+                    ${thumb ? `<img src="${thumb}" class="w-9 h-9 rounded-lg object-cover shrink-0">`
+                           : `<span class="w-9 h-9 rounded-lg bg-apple-tag text-apple-sub text-[9px] flex items-center justify-center shrink-0">文</span>`}
+                    <div class="flex-1 min-w-0">
+                        <p class="font-serif text-[11px] text-apple-text truncate">${f.text}</p>
+                        <p class="text-[9px] text-apple-sub truncate mt-0.5">${f.dateGroup} · ${f.location}</p>
+                    </div>
+                    <span class="text-[9px] shrink-0 ${isSel ? 'text-apple-accent font-semibold' : 'text-apple-sub'}">${isSel ? '已加入' : '加入'}</span>
+                </div>`;
+            }).join('');
+        }
+
+        function toggleFragmentInsideStudio(id) {
+            if (selectedIds.has(id) && selectedIds.size <= 1) {
+                showToast("至少保留 1 项碎片");
+                return;
+            }
+            if (selectedIds.has(id)) selectedIds.delete(id);
+            else selectedIds.add(id);
+            syncStudioPhotosFromFragments();
+            renderFragmentManagerList();
+            renderStudioCanvas();
+        }
+
+        function openAlbumPicker() {
+            renderAlbumPickerList();
+            const m = document.getElementById('album-picker-sheet');
+            m.classList.remove('hidden');
+            m.classList.add('flex');
+        }
+
+        function closeAlbumPicker() {
+            const m = document.getElementById('album-picker-sheet');
+            m.classList.add('hidden');
+            m.classList.remove('flex');
+        }
+
+        function renderAlbumPickerList() {
+            const el = document.getElementById('album-picker-list');
+            if (!el) return;
+            el.innerHTML = albumBooks.map(b => {
+                const active = editingPageRef && editingPageRef.albumId === b.id;
+                return `
+                <button onclick="confirmAppendToAlbum('${b.id}')" class="w-full flex items-center space-x-3 p-2 rounded-2xl bg-white border ${active ? 'border-apple-accent' : 'border-black/[0.04]'} active:scale-[0.99] transition-transform">
+                    <img src="${b.cover}" class="w-9 h-12 rounded-lg object-cover shrink-0">
+                    <div class="flex-1 text-left min-w-0">
+                        <p class="font-serif text-[12px] font-semibold text-apple-text truncate">《${b.title}》</p>
+                        <p class="text-[9px] text-apple-sub mt-0.5 truncate">${b.pages.length} 页 · ${b.subtitle}</p>
+                    </div>
+                    ${active ? '<span class="text-[9px] text-apple-accent shrink-0">正在编辑</span>' : '<i data-lucide="chevron-right" class="w-3.5 h-3.5 text-apple-sub/50 shrink-0"></i>'}
+                </button>`;
+            }).join('');
+            lucide.createIcons();
+        }
+
+        function confirmAppendToAlbum(albumId) {
+            closeAlbumPicker();
+            appendPosterPageToAlbum(albumId);
+        }
+
+        function appendPosterPageToAlbum(albumId) {
+            const list = getSelectedFragmentsList();
+            const targetAlbumId = albumId || pendingAlbumTargetId || (editingPageRef ? editingPageRef.albumId : albumBooks[0].id);
+            pendingAlbumTargetId = null;
+            const album = albumBooks.find(a => a.id === targetAlbumId);
+            const titleText = studioState.customTitle || `在${list[0]?.location || '街角'}被治愈的日常切片`;
+            const bodyText = (studioState.storyBlocks || []).filter(b => b.showText).map(b => b.text).join(' ');
+            const coverImg = studioState.storyBlocks?.find(b => b.photos?.length)?.photos?.[0]?.url || samplePhotoPool[0];
+
+            const newPageObj = {
+                id: editingPageRef ? editingPageRef.pageId : ('page_' + Date.now()),
+                dateStr: '2026.11.04',
+                title: titleText,
+                bodyText: bodyText,
+                theme: studioState.theme,
+                format: studioState.format,
+                customBgStyle: studioState.customBgStyle,
+                fragmentIds: list.map(f => f.id),
+                storyBlocks: JSON.parse(JSON.stringify(studioState.storyBlocks || []))
+            };
+
+            let targetPageIndex = 0;
+            if (album) {
+                if (editingPageRef && editingPageRef.albumId === album.id) {
+                    const idx = album.pages.findIndex(p => p.id === editingPageRef.pageId);
+                    if (idx >= 0) {
+                        album.pages[idx] = newPageObj;
+                        targetPageIndex = idx;
+                    } else {
+                        album.pages.unshift(newPageObj);
+                    }
+                } else {
+                    album.pages.unshift(newPageObj);
+                }
+                album.cover = coverImg;
+                list.forEach(f => {
+                    f.albumId = album.id;
+                    f.pageId = newPageObj.id;
+                });
+            }
+
+            selectedIds.clear();
+            studioState.customTitle = '';
+            studioState.customBgStyle = '';
+            closeStudioModal();
+            switchMainTab('albums');
+            if (album) openAlbumReader(album.id, targetPageIndex);
+            showToast(`已装订进《${album ? album.title : '日常周记'}》`);
+        }
+
+        // ==================== 6.5 真实分享链路 ====================
+        let currentShareData = { title: '', body: '', loc: '' };
+
+        function openShareSheetFromStudio() {
+            const list = getSelectedFragmentsList();
+            const thumb = studioState.storyBlocks?.find(b => b.photos?.length)?.photos?.[0]?.url || list[0]?.images?.[0] || samplePhotoPool[0];
+            const title = studioState.customTitle || `在${list[0]?.location || '街角'}被治愈的日常切片`;
+            const desc = (studioState.storyBlocks || []).filter(b => b.showText).map(b => b.text).join(' ');
+            const loc = list.map(f => f.location).filter(Boolean).join(' · ');
+            openShareSheetCommon(thumb, title, desc, loc);
+        }
+
+        function openShareSheetFromReader() {
+            if (!readingAlbum) return;
+            const page = readingAlbum.pages[readingPageIndex];
+            const f = fragments.find(fr => page.fragmentIds.includes(fr.id));
+            const thumb = page.storyBlocks?.[0]?.photos?.[0]?.url || f?.images?.[0] || readingAlbum.cover;
+            openShareSheetCommon(thumb, page.title, page.bodyText || f?.text || '', f?.location || '日常记录');
+        }
+
+        function openShareSheetCommon(thumb, title, desc, loc) {
+            currentShareData = { title, body: desc, loc: loc || '生活切片' };
+            document.getElementById('share-preview-thumb').src = thumb;
+            document.getElementById('share-preview-title').innerText = title;
+            switchShareCopyStyle('xhs');
+            const modal = document.getElementById('share-sheet-modal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+            lucide.createIcons();
+        }
+
+        function switchShareCopyStyle(style) {
+            const xhsBtn = document.getElementById('copy-tab-xhs');
+            const momBtn = document.getElementById('copy-tab-moments');
+            const box = document.getElementById('share-copywriting-box');
+            const body = (currentShareData.body || '').replace(/\s+/g, ' ').trim();
+            if (style === 'xhs') {
+                xhsBtn.className = "flex-1 py-1.5 rounded-full bg-white text-apple-text shadow-sm";
+                momBtn.className = "flex-1 py-1.5 rounded-full";
+                box.value = `${currentShareData.title}\n\n${body}\n\n📍 ${currentShareData.loc}\n#日常碎片 #生活美学 #Plog`;
+            } else {
+                momBtn.className = "flex-1 py-1.5 rounded-full bg-white text-apple-text shadow-sm";
+                xhsBtn.className = "flex-1 py-1.5 rounded-full";
+                box.value = `${currentShareData.title}。${body.slice(0, 42)}`;
+            }
+        }
+
+        function saveRenderedImageToPhone() {
+            const btn = document.getElementById('btn-save-img');
+            if (!btn) return;
+            btn.innerHTML = `<i data-lucide="check" class="w-3.5 h-3.5"></i><span>已存相册</span>`;
+            btn.className = "flex-1 py-2.5 rounded-2xl bg-emerald-600 text-white text-[11px] font-semibold flex items-center justify-center space-x-1";
+            lucide.createIcons();
+            showToast("高清画报已保存至系统相册");
+        }
+
+        function copyTextToClipboardFallback(text) {
+            const ta = document.createElement('textarea');
+            ta.value = text;
+            ta.style.position = 'fixed';
+            ta.style.opacity = '0';
+            document.body.appendChild(ta);
+            ta.select();
+            try { document.execCommand('copy'); } catch (e) {}
+            document.body.removeChild(ta);
+        }
+
+        function copyAndRemindPlatform() {
+            const text = document.getElementById('share-copywriting-box').value;
+            copyTextToClipboardFallback(text);
+            saveRenderedImageToPhone();
+            setTimeout(() => {
+                closeShareSheet();
+                showToast("图片已存相册 & 文案已复制，可前往小红书/微信直接粘贴发布");
+            }, 600);
+        }
+
+        function closeShareSheet() {
+            const modal = document.getElementById('share-sheet-modal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+
+        // ==================== 7. 多图上传与速记 ====================
+        function togglePhotoPickerDrawer() {
+            const drawer = document.getElementById('multi-photo-drawer');
+            drawer.classList.toggle('hidden');
+            if (!drawer.classList.contains('hidden')) renderPhotoPickerGrid();
+        }
+
+        function renderPhotoPickerGrid() {
+            const grid = document.getElementById('photo-picker-grid');
+            grid.innerHTML = samplePhotoPool.map(url => {
+                const idx = pendingUploadImages.indexOf(url);
+                const selected = idx >= 0;
+                return `
+                    <div onclick="togglePendingImage('${url}')" class="relative aspect-square rounded-xl overflow-hidden cursor-pointer border-2 ${selected ? 'border-apple-accent' : 'border-transparent'}">
+                        <img src="${url}" class="w-full h-full object-cover">
+                        <span class="absolute top-1 right-1 w-4 h-4 rounded-full text-[9px] font-bold flex items-center justify-center ${selected ? 'bg-apple-accent text-white' : 'bg-black/40 text-white/70'}">
+                            ${selected ? idx + 1 : '+'}
+                        </span>
+                    </div>`;
+            }).join('');
+        }
+
+        function togglePendingImage(url) {
+            const idx = pendingUploadImages.indexOf(url);
+            if (idx >= 0) pendingUploadImages.splice(idx, 1);
+            else pendingUploadImages.push(url);
+            renderPhotoPickerGrid();
+            updateComposerAttachmentsBar();
+        }
+
+        function updateComposerAttachmentsBar() {
+            const bar = document.getElementById('composer-attachments');
+            const badge = document.getElementById('composer-img-badge');
+            if (pendingUploadImages.length > 0) {
+                badge.innerText = pendingUploadImages.length;
+                badge.classList.remove('hidden');
+                bar.classList.remove('hidden');
+                bar.innerHTML = `
+                    <div class="flex items-center space-x-1.5 overflow-x-auto no-scrollbar py-0.5">
+                        ${pendingUploadImages.map(u => `<img src="${u}" class="w-7 h-7 rounded-lg object-cover border border-black/10">`).join('')}
+                        <span class="text-apple-sub text-[10px] pl-1">已选 ${pendingUploadImages.length} 张</span>
+                    </div>
+                    <button onclick="clearPendingAttachments()" class="text-apple-sub text-[10px] shrink-0 ml-2">清空</button>`;
+            } else {
+                badge.classList.add('hidden');
+                bar.classList.add('hidden');
+            }
+        }
+
+        function clearPendingAttachments() {
+            pendingUploadImages = [];
+            updateComposerAttachmentsBar();
+            renderPhotoPickerGrid();
+        }
+
+        function simulateVoiceInput() {
+            const input = document.getElementById('composer-input');
+            input.value = '路过街角面包房买到了热乎的可颂，傍晚的风吹在脸上刚刚好。';
+            showToast("语音已转写为文字");
+        }
+
+        function addNewFragment() {
+            const input = document.getElementById('composer-input');
+            const text = input.value.trim();
+            if (!text && pendingUploadImages.length === 0) {
+                showToast("写句话或选张照片吧");
+                return;
+            }
+            const autoLoc = autoContextPresets[currentContextPresetIdx]?.location || '安福路街角';
+            const now = new Date();
+            const hh = String(now.getHours()).padStart(2, '0');
+            const mm = String(now.getMinutes()).padStart(2, '0');
+            fragments.unshift({
+                id: 'f_' + Date.now(),
+                year: 2026,
+                monthKey: 11,
+                dayNum: 4,
+                dateGroup: '今天 · 11月4日',
+                isToday: true,
+                time: `${hh}:${mm}`,
+                fuzzyPeriod: '',
+                sortMinutes: 1439,
+                location: autoLoc,
+                mapX: 52,
+                mapY: 48,
+                range: 'week',
+                type: pendingUploadImages.length > 1 ? 'multi-photo' : 'photo-note',
+                images: pendingUploadImages.length > 0 ? [...pendingUploadImages] : [],
+                text: text || '随手定格的日常瞬间。',
+                albumId: null,
+                pageId: null
+            });
+            input.value = '';
+            pendingUploadImages = [];
+            document.getElementById('multi-photo-drawer').classList.add('hidden');
+            updateComposerAttachmentsBar();
+            renderTimeline();
+            showToast("已记入今日碎片");
+        }
+
+        // ==================== 8. 导航切换 ====================
+        let currentTimeScale = 'day';
+
+        function toggleQuickDateJump() {
+            if (currentMainTab !== 'fragments') return;
+            const pop = document.getElementById('quick-date-popover');
+            pop.classList.toggle('hidden');
+            if (!pop.classList.contains('hidden')) {
+                renderPopoverCalendar();
+            }
+        }
+
+        function jumpToToday() {
+            filterDateMode = 'all';
+            filterDayNum = null;
+            pickerYear = 2026;
+            pickerMonth = 11;
+            updateHeaderDateLabel();
+            document.getElementById('quick-date-popover').classList.add('hidden');
+            switchTimeScale('day');
+            renderTimeline();
+            document.getElementById('main-scroll-area').scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        function handleMainScroll(el) {
+            const pill = document.getElementById('back-to-today-pill');
+            if (el.scrollTop > 160 && currentMainTab === 'fragments' && currentTimeScale === 'day') {
+                pill.classList.remove('hidden');
+            } else {
+                pill.classList.add('hidden');
+            }
+
+            if (currentMainTab === 'fragments' && currentTimeScale === 'day' && filterDateMode === 'all') {
+                const secs = el.querySelectorAll('.timeline-date-sec');
+                const containerTop = el.getBoundingClientRect().top;
+                for (let i = 0; i < secs.length; i++) {
+                    const rect = secs[i].getBoundingClientRect();
+                    if (rect.bottom > containerTop + 40) {
+                        const y = parseInt(secs[i].getAttribute('data-year'));
+                        const m = parseInt(secs[i].getAttribute('data-month'));
+                        updateHeaderDateLabel(y, m);
+                        break;
+                    }
+                }
+            }
+        }
+
+        function switchTimeScale(scale) {
+            currentTimeScale = scale;
+            document.getElementById('quick-date-popover').classList.add('hidden');
+            ['day', 'gallery', 'map'].forEach(s => {
+                const viewEl = document.getElementById(`scale-view-${s}`);
+                const btnEl = document.getElementById(`scale-${s}`);
+                if (viewEl) viewEl.classList.add('hidden');
+                if (btnEl) btnEl.className = "flex-1 py-1 rounded-[9px] text-apple-sub transition-all";
+            });
+            document.getElementById(`scale-view-${scale}`).classList.remove('hidden');
+            document.getElementById(`scale-${scale}`).className = "flex-1 py-1 rounded-[9px] bg-white text-apple-text shadow-sm transition-all";
+
+            document.getElementById('btn-uncurated').classList.toggle('hidden', scale !== 'day');
+            if (scale !== 'day') document.getElementById('back-to-today-pill').classList.add('hidden');
+
+            if (scale === 'gallery') renderVisualGalleryGrid();
+            if (scale === 'map') renderMapPins();
+        }
+
+        function switchMainTab(tab) {
+            currentMainTab = tab;
+            const isFrag = (tab === 'fragments');
+            document.getElementById('quick-date-popover').classList.add('hidden');
+            document.getElementById('tab-view-fragments').classList.toggle('hidden', !isFrag);
+            document.getElementById('tab-view-albums').classList.toggle('hidden', isFrag);
+            document.getElementById('sub-nav-fragments').classList.toggle('hidden', !isFrag);
+            document.getElementById('quick-input-bar').classList.toggle('hidden', !isFrag || selectedIds.size > 0);
+
+            if (isFrag) {
+                updateHeaderDateLabel();
+                document.getElementById('header-year-sub').classList.remove('hidden');
+            } else {
+                document.getElementById('header-date-title').innerText = '记忆画册书架';
+                document.getElementById('header-year-sub').classList.add('hidden');
+                document.getElementById('header-filter-pill').classList.add('hidden');
+            }
+            document.getElementById('header-right-actions').classList.toggle('hidden', !isFrag);
+            if (!isFrag) {
+                document.getElementById('back-to-today-pill').classList.add('hidden');
+                document.getElementById('search-bar-wrap').classList.add('hidden');
+            }
+
+            document.getElementById('main-tab-fragments').className = isFrag
+                ? "flex flex-col items-center space-y-0.5 text-apple-text"
+                : "flex flex-col items-center space-y-0.5 text-apple-sub";
+            document.getElementById('main-tab-albums').className = !isFrag
+                ? "flex flex-col items-center space-y-0.5 text-apple-text relative"
+                : "flex flex-col items-center space-y-0.5 text-apple-sub relative";
+
+            if (!isFrag) {
+                renderBookshelf();
+                switchClusterCategory('people');
+            }
+            lucide.createIcons();
+        }
+
+        function toggleUncuratedFilter() {
+            onlyUncurated = !onlyUncurated;
+            const btn = document.getElementById('btn-uncurated');
+            btn.className = onlyUncurated
+                ? "px-2.5 py-1 rounded-full bg-apple-accent text-white text-[11px] font-semibold transition-all"
+                : "px-2.5 py-1 rounded-full bg-apple-tag text-apple-sub text-[11px] font-medium transition-all";
+            renderTimeline();
+        }
+
+        function toggleSearchBar() {
+            const wrap = document.getElementById('search-bar-wrap');
+            wrap.classList.toggle('hidden');
+            if (!wrap.classList.contains('hidden')) document.getElementById('semantic-search-input').focus();
+        }
+
+        function handleSearch(val) {
+            currentSearchQuery = val.trim();
+            renderTimeline();
+        }
+
+        function clearSearch() {
+            currentSearchQuery = '';
+            document.getElementById('semantic-search-input').value = '';
+            document.getElementById('search-bar-wrap').classList.add('hidden');
+            renderTimeline();
+        }
+
+        function showToast(msg) {
+            const t = document.getElementById('toast-msg');
+            t.innerText = msg;
+            const studioOpen = !document.getElementById('studio-modal').classList.contains('hidden');
+            t.classList.toggle('top-[104px]', studioOpen);
+            t.classList.toggle('top-14', !studioOpen);
+            t.classList.remove('hidden');
+            setTimeout(() => t.classList.add('hidden'), 2200);
+        }
+
+        window.onload = function () {
+            renderTimeline();
+            renderBookshelf();
+            switchClusterCategory('people');
+            lucide.createIcons();
+        };
+    </script>
+</body>
+</html>
